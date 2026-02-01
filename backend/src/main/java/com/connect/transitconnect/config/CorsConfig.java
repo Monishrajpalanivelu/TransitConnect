@@ -14,12 +14,14 @@ public class CorsConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
-                        .allowedOrigins(
+                        // allowedOriginPatterns is required for wildcards + allowCredentials
+                        .allowedOriginPatterns(
                             "http://localhost:3000",
+                            "https://*.netlify.app", 
                             "https://transitfrontend.netlify.app"
                         )
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                        .allowedHeaders("Authorization", "Content-Type")
+                        .allowedHeaders("*")
                         .allowCredentials(true);
             }
         };
