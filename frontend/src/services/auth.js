@@ -6,7 +6,6 @@ const API_URL = `${BASE_URL}/auth`;
 
 export const login = async (username, password) => {
       try {
-            // Now it will hit https://transitconnect-production.up.railway.app/auth/login
             const response = await axios.post(`${API_URL}/login`, {
                   username,
                   password,
@@ -33,4 +32,17 @@ export const register = async (username, email, password) => {
             throw error;
       }
 };
-// ... rest of your code
+
+// Added 'export' to these three functions so the compiler can find them
+export const logout = () => {
+      localStorage.removeItem("token");
+      localStorage.removeItem("role");
+};
+
+export const getToken = () => {
+      return localStorage.getItem("token");
+};
+
+export const isAuthenticated = () => {
+      return !!localStorage.getItem("token");
+};
