@@ -10,6 +10,25 @@ const getAuthHeaders = () => {
   };
 };
 
+/**
+ * Helper to handle the response and check for 401/403
+ */
+async function handleResponse(res) {
+  if (res.status === 401 || res.status === 403) {
+    // Clear any dead token and kick to login
+    localStorage.removeItem("token"); 
+    window.location.href = "/login"; 
+    return;
+  }
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(errorText || "Request failed");
+  }
+
+  return res.json();
+}
+
 /* ADD ROUTE */
 export async function addRoute(payload) {
   const res = await fetch(`${BASE}/add`, {
@@ -17,9 +36,7 @@ export async function addRoute(payload) {
     headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
-
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return handleResponse(res);
 }
 
 /* SEARCH ROUTE */
@@ -29,11 +46,8 @@ export async function searchRoutes(stop1, stop2, mode = "shortest") {
       stop2
     )}&mode=${mode}`, {
     headers: getAuthHeaders()
-  }
-  );
-
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  });
+  return handleResponse(res);
 }
 
 /* GET ALL ROUTES */
@@ -41,8 +55,7 @@ export async function getAllRoutes() {
   const res = await fetch(`${BASE}/all`, {
     headers: getAuthHeaders()
   });
-  if (!res.ok) throw new Error("Failed to load routes");
-  return res.json();
+  return handleResponse(res);
 }
 
 /* ⭐ GET ALL STOP NAMES */
@@ -50,6 +63,5 @@ export async function fetchStops() {
   const res = await fetch(`${BASE}/stops`, {
     headers: getAuthHeaders()
   });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return handleResponse(res);
 }
