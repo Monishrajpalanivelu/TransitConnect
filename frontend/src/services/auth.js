@@ -1,9 +1,12 @@
 import axios from "axios";
 
-const API_URL = "http://localhost:8080/auth";
+// This checks for the Netlify variable, otherwise defaults to Railway
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || "https://transitconnect-production.up.railway.app";
+const API_URL = `${BASE_URL}/auth`;
 
 export const login = async (username, password) => {
       try {
+            // Now it will hit https://transitconnect-production.up.railway.app/auth/login
             const response = await axios.post(`${API_URL}/login`, {
                   username,
                   password,
@@ -30,16 +33,4 @@ export const register = async (username, email, password) => {
             throw error;
       }
 };
-
-export const logout = () => {
-      localStorage.removeItem("token");
-      localStorage.removeItem("role");
-};
-
-export const getToken = () => {
-      return localStorage.getItem("token");
-};
-
-export const isAuthenticated = () => {
-      return !!localStorage.getItem("token");
-};
+// ... rest of your code
