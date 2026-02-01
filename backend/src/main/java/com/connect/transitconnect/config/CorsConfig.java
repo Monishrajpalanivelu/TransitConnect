@@ -14,10 +14,9 @@ public class CorsConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
-                        // allowedOriginPatterns is required for wildcards + allowCredentials
                         .allowedOriginPatterns(
                             "http://localhost:3000",
-                            "https://*.netlify.app", 
+                            "https://*.netlify.app", // Covers all Netlify previews
                             "https://transitfrontend.netlify.app"
                         )
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
