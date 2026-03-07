@@ -14,6 +14,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/routes")
+@CrossOrigin(origins = { "http://localhost:3000", "https://transitconnect-production.up.railway.app" })
 public class RouteController {
 
     private final RouteService routeService;

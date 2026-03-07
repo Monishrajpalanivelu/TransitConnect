@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // This checks for the Netlify variable, otherwise defaults to Railway
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || "https://transitconnect-production.up.railway.app";
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:8081";
 const API_URL = `${BASE_URL}/auth`;
 
 export const login = async (username, password) => {

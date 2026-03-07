@@ -1,6 +1,7 @@
 import { getToken } from "./auth";
 
-const BASE = `${process.env.REACT_APP_API_BASE_URL}/api/routes`;
+const API_BASE = process.env.REACT_APP_API_BASE_URL || "http://localhost:8081";
+const BASE = `${API_BASE}/api/routes`;
 
 const getAuthHeaders = () => {
   const token = getToken();
@@ -16,8 +17,8 @@ const getAuthHeaders = () => {
 async function handleResponse(res) {
   if (res.status === 401 || res.status === 403) {
     // Clear any dead token and kick to login
-    localStorage.removeItem("token"); 
-    window.location.href = "/login"; 
+    localStorage.removeItem("token");
+    window.location.href = "/login";
     return;
   }
 
