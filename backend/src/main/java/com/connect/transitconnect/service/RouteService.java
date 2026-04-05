@@ -6,6 +6,7 @@ import com.connect.transitconnect.repository.RouteRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -18,9 +19,38 @@ public class RouteService {
         this.routeRepository = routeRepository;
     }
 
-    // ============================
-    // DTO → Entity Converters
-    // ============================
+    // =========================================================================
+    // INNER CLASSES
+    // =========================================================================
+
+    private static class Edge {
+        final String to;
+        final int cost;
+        final int duration;
+        final String mode;
+
+        Edge(String to, Integer cost, Integer duration, String mode) {
+            this.to       = to;
+            this.cost     = cost     != null ? cost     : 0;
+            this.duration = duration != null ? duration : 0;
+            this.mode     = mode;
+        }
+    }
+
+    private static class Node {
+        final String loc;
+        final int weight;
+
+        Node(String loc, int weight) {
+            this.loc    = loc;
+            this.weight = weight;
+        }
+    }
+
+    // =========================================================================
+    // DTO <-> ENTITY CONVERTERS
+    // =========================================================================
+
     private StopEntity toStopEntity(StopDTO dto) {
         StopEntity e = new StopEntity();
         e.setLocation(dto.getLocation());
@@ -37,18 +67,19 @@ public class RouteService {
         return h;
     }
 
-    // ============================
+    // =========================================================================
     // SAVE ROUTE
-    // ============================
+    // =========================================================================
+
     public RouteEntity saveRoute(RouteInputDTO dto) {
         List<StopDTO> stopDTOs = dto.getStops();
-        List<HopDTO> hopDTOs = dto.getHops();
+        List<HopDTO>  hopDTOs  = dto.getHops();
 
         if (stopDTOs == null || stopDTOs.size() < 2)
             throw new IllegalArgumentException("Route must have at least 2 stops");
 
         if (hopDTOs == null || hopDTOs.size() != stopDTOs.size() - 1)
-            throw new IllegalArgumentException("Hops must be exactly stops.size() - 1");
+            throw new IllegalArgumentException("Hops count must equal stops.size() - 1");
 
         List<StopEntity> stopEntities = stopDTOs.stream()
                 .map(this::toStopEntity)
@@ -60,18 +91,21 @@ public class RouteService {
                     h.setFromStop(stopEntities.get(i));
                     h.setToStop(stopEntities.get(i + 1));
                     return h;
-                }).collect(Collectors.toList());
+                })
+                .collect(Collectors.toList());
 
         RouteEntity route = new RouteEntity();
         route.setStops(stopEntities);
         route.setHops(hopEntities);
 
+        invalidateGraphCache();
         return routeRepository.save(route);
     }
 
-    // ============================
-    // BASIC OPERATIONS
-    // ============================
+    // =========================================================================
+    // BASIC CRUD
+    // =========================================================================
+
     public List<RouteEntity> getAllRoutes() {
         return routeRepository.findAll();
     }
@@ -82,237 +116,164 @@ public class RouteService {
 
     public void deleteRoute(Long id) {
         routeRepository.deleteById(id);
+        invalidateGraphCache();
     }
 
-    // ============================
-    // OLD smartSearch (unchanged)
-    // ============================
-    // public Optional<Object> smartSearch(String qStop1, String qStop2) {
-    //
-    // if (qStop1 == null || qStop2 == null) return Optional.empty();
-    //
-    // String stop1 = qStop1.toLowerCase().trim();
-    // String stop2 = qStop2.toLowerCase().trim();
-    //
-    // List<RouteEntity> allRoutes = routeRepository.findAll();
-    //
-    // for (RouteEntity route : allRoutes) {
-    // List<StopEntity> stops = route.getStops();
-    //
-    // List<String> locs = stops.stream()
-    // .map(s -> s.getLocation().toLowerCase())
-    // .collect(Collectors.toList());
-    //
-    // int idx1 = -1, idx2 = -1;
-    // for (int i = 0; i < locs.size(); i++) {
-    // if (locs.get(i).contains(stop1)) idx1 = i;
-    // if (locs.get(i).contains(stop2)) idx2 = i;
-    // }
-    //
-    // if (idx1 == -1 || idx2 == -1) continue;
-    //
-    // int startIndex = Math.min(idx1, idx2);
-    // int endIndex = Math.max(idx1, idx2);
-    //
-    // if (startIndex == 0 && endIndex == stops.size() - 1)
-    // return Optional.of(route);
-    //
-    // List<StopEntity> segStops = stops.subList(startIndex, endIndex + 1);
-    // List<HopEntity> routeHops = route.getHops();
-    // List<HopEntity> segHops = routeHops.subList(startIndex, endIndex);
-    //
-    // List<StopDTO> segStopDTOs = segStops.stream().map(s -> {
-    // StopDTO sd = new StopDTO();
-    // sd.setLocation(s.getLocation());
-    // sd.setLatitude(s.getLatitude());
-    // sd.setLongitude(s.getLongitude());
-    // return sd;
-    // }).collect(Collectors.toList());
-    //
-    // List<HopDTO> segHopDTOs = segHops.stream().map(h -> {
-    // HopDTO hd = new HopDTO();
-    // hd.setCost(h.getCost());
-    // hd.setMode(h.getMode());
-    // return hd;
-    // }).collect(Collectors.toList());
-    //
-    // int totalCost = segHopDTOs.stream()
-    // .mapToInt(hd -> hd.getCost() == null ? 0 : hd.getCost())
-    // .sum();
-    //
-    // RouteSegmentDTO segDTO = new RouteSegmentDTO();
-    // segDTO.setSegmentStops(segStopDTOs);
-    // segDTO.setSegmentHops(segHopDTOs);
-    // segDTO.setTotalCost(totalCost);
-    // segDTO.setStopsCount(segStopDTOs.size());
-    //
-    // return Optional.of(segDTO);
-    // }
-    //
-    // return Optional.empty();
-    // }
+    // =========================================================================
+    // GET ALL STOP NAMES
+    // =========================================================================
 
-    // ========================================================================
-    // MULTI-ROUTE GRAPH BASED SEARCH ENGINE
-    // - findShortestPath() → minimum hops
-    // - findMinCostPath() → minimum cost
-    // ========================================================================
+    public List<String> getAllStopNames() {
+        return routeRepository.findAll().stream()
+                .flatMap(r -> r.getStops().stream())
+                .map(StopEntity::getLocation)
+                .distinct()
+                .collect(Collectors.toList());
+    }
 
-    private static class Edge {
-        final String to;
-        final Integer cost;
-        final Integer duration;
-        final String mode;
+    // =========================================================================
+    // GRAPH CACHE
+    // locToEntityCache is ALWAYS keyed by lowercase — matches graph keys exactly.
+    // =========================================================================
 
-        Edge(String to, Integer cost, Integer duration, String mode) {
-            this.to = to;
-            this.cost = cost;
-            this.duration = duration;
-            this.mode = mode;
+    private Map<String, List<Edge>> graphCache       = null;
+    private Map<String, StopEntity> locToEntityCache = null;
+
+    private synchronized void invalidateGraphCache() {
+        graphCache       = null;
+        locToEntityCache = null;
+    }
+
+    private synchronized Map<String, List<Edge>> getOrBuildGraph(
+            Map<String, StopEntity> locToEntity) {
+
+        if (graphCache != null) {
+            locToEntity.putAll(locToEntityCache);
+            return graphCache;
         }
-    }
 
-    private static class Node {
-        String loc;
-        int weight; // can be cost or duration
-
-        Node(String l, int w) {
-            loc = l;
-            weight = w;
-        }
-    }
-
-    private Map<String, List<Edge>> buildGraph(Map<String, StopEntity> locToEntity) {
-
-        Map<String, List<Edge>> graph = new HashMap<>();
-        List<RouteEntity> allRoutes = routeRepository.findAll();
+        Map<String, List<Edge>> graph    = new HashMap<>();
+        Map<String, StopEntity> locToEnt = new HashMap<>();
+        List<RouteEntity> allRoutes       = routeRepository.findAll();
 
         for (RouteEntity route : allRoutes) {
             List<StopEntity> stops = route.getStops();
-            List<HopEntity> hops = route.getHops();
+            List<HopEntity>  hops  = route.getHops();
 
-            if (stops == null || stops.size() < 2)
-                continue;
+            if (stops == null || stops.size() < 2) continue;
 
             List<String> locs = stops.stream()
                     .map(s -> s.getLocation().toLowerCase().trim())
                     .collect(Collectors.toList());
 
             for (int i = 0; i < stops.size(); i++) {
-                String loc = locs.get(i);
-                locToEntity.putIfAbsent(loc, stops.get(i));
-                graph.putIfAbsent(loc, new ArrayList<>());
+                String key = locs.get(i);
+                locToEnt.putIfAbsent(key, stops.get(i));
+                graph.putIfAbsent(key, new ArrayList<>());
             }
 
             for (int i = 0; i < locs.size() - 1; i++) {
-                String u = locs.get(i);
-                String v = locs.get(i + 1);
-
-                Integer cost = hops.get(i).getCost();
-                Integer duration = hops.get(i).getDuration();
-                String mode = hops.get(i).getMode();
-
-                graph.get(u).add(new Edge(v, cost, duration, mode));
-                graph.get(v).add(new Edge(u, cost, duration, mode)); // reverse travel enabled
+                String u   = locs.get(i);
+                String v   = locs.get(i + 1);
+                HopEntity hop = hops.get(i);
+                // ALL edges are added — including parallel edges between same stops.
+                // Dijkstra/BFS will naturally pick the best one via relaxation.
+                graph.get(u).add(new Edge(v, hop.getCost(), hop.getDuration(), hop.getMode()));
+                graph.get(v).add(new Edge(u, hop.getCost(), hop.getDuration(), hop.getMode()));
             }
         }
-        return graph;
+
+        graphCache       = graph;
+        locToEntityCache = locToEnt;
+        locToEntity.putAll(locToEnt);
+        return graphCache;
     }
 
-    // ==========================================================
-    // SHORTEST PATH (MINIMUM HOPS)
-    // ==========================================================
-    public Optional<Object> findShortestPath(String qStop1, String qStop2) {
+    // =========================================================================
+    // PUBLIC SEARCH METHODS
+    // =========================================================================
 
-        if (qStop1 == null || qStop2 == null)
-            return Optional.empty();
+    public Optional<RouteSegmentDTO> findShortestPath(String qStop1, String qStop2) {
+        return bfsSearch(qStop1, qStop2);
+    }
+
+    public Optional<RouteSegmentDTO> findFastestPath(String qStop1, String qStop2) {
+        return dijkstra(qStop1, qStop2, e -> e.duration);
+    }
+
+    public Optional<RouteSegmentDTO> findMinCostPath(String qStop1, String qStop2) {
+        return dijkstra(qStop1, qStop2, e -> e.cost);
+    }
+
+    // =========================================================================
+    // BFS - minimum hops
+    // =========================================================================
+
+    private Optional<RouteSegmentDTO> bfsSearch(String qStop1, String qStop2) {
+        if (qStop1 == null || qStop2 == null) return Optional.empty();
+
         String stop1 = qStop1.toLowerCase().trim();
         String stop2 = qStop2.toLowerCase().trim();
 
         Map<String, StopEntity> locToEntity = new HashMap<>();
-        Map<String, List<Edge>> graph = buildGraph(locToEntity);
+        Map<String, List<Edge>> graph       = getOrBuildGraph(locToEntity);
 
-        Set<String> starts = graph.keySet().stream()
-                .filter(s -> s.contains(stop1))
-                .collect(Collectors.toSet());
+        Set<String> starts = matchingKeys(graph, stop1);
+        Set<String> ends   = matchingKeys(graph, stop2);
+        if (starts.isEmpty() || ends.isEmpty()) return Optional.empty();
 
-        Set<String> ends = graph.keySet().stream()
-                .filter(s -> s.contains(stop2))
-                .collect(Collectors.toSet());
-
-        if (starts.isEmpty() || ends.isEmpty())
-            return Optional.empty();
-
-        Queue<String> q = new ArrayDeque<>();
-        Map<String, String> parent = new HashMap<>();
-        Set<String> visited = new HashSet<>();
-
-        for (String s : starts) {
-            q.add(s);
-            visited.add(s);
-            parent.put(s, null);
-        }
+        Queue<String>       queue   = new ArrayDeque<>(starts);
+        Set<String>         visited = new HashSet<>(starts);
+        Map<String, String> parent  = new HashMap<>();
+        starts.forEach(s -> parent.put(s, null));
 
         String found = null;
 
-        while (!q.isEmpty()) {
-            String curr = q.poll();
-            if (ends.contains(curr)) {
-                found = curr;
-                break;
-            }
+        while (!queue.isEmpty()) {
+            String curr = queue.poll();
+            if (ends.contains(curr)) { found = curr; break; }
 
             for (Edge e : graph.get(curr)) {
                 if (!visited.contains(e.to)) {
                     visited.add(e.to);
                     parent.put(e.to, curr);
-                    q.add(e.to);
+                    queue.add(e.to);
                 }
             }
         }
 
-        if (found == null)
-            return Optional.empty();
+        if (found == null) return Optional.empty();
 
-        List<String> path = new ArrayList<>();
-        String cur = found;
-        while (cur != null) {
-            path.add(cur);
-            cur = parent.get(cur);
-        }
-        Collections.reverse(path);
-
-        return Optional.of(buildSegmentDTOFromPath(path, graph, locToEntity));
+        // BFS does not optimize weight — pass null weightFn, buildSegmentDTO
+        // will just pick the first available edge (hop count is what matters here)
+        return Optional.of(buildSegmentDTO(
+                reconstructPath(found, parent), graph, locToEntity, null));
     }
 
-    // ==========================================================
-    // FASTEST PATH (DIJKSTRA on DURATION)
-    // ==========================================================
-    public Optional<Object> findFastestPath(String qStop1, String qStop2) {
+    // =========================================================================
+    // GENERIC DIJKSTRA - Strategy Pattern
+    // =========================================================================
 
-        if (qStop1 == null || qStop2 == null)
-            return Optional.empty();
+    private Optional<RouteSegmentDTO> dijkstra(
+            String qStop1, String qStop2,
+            Function<Edge, Integer> weightFn) {
+
+        if (qStop1 == null || qStop2 == null) return Optional.empty();
+
         String stop1 = qStop1.toLowerCase().trim();
         String stop2 = qStop2.toLowerCase().trim();
 
         Map<String, StopEntity> locToEntity = new HashMap<>();
-        Map<String, List<Edge>> graph = buildGraph(locToEntity);
+        Map<String, List<Edge>> graph       = getOrBuildGraph(locToEntity);
 
-        Set<String> starts = graph.keySet().stream()
-                .filter(s -> s.contains(stop1))
-                .collect(Collectors.toSet());
+        Set<String> starts = matchingKeys(graph, stop1);
+        Set<String> ends   = matchingKeys(graph, stop2);
+        if (starts.isEmpty() || ends.isEmpty()) return Optional.empty();
 
-        Set<String> ends = graph.keySet().stream()
-                .filter(s -> s.contains(stop2))
-                .collect(Collectors.toSet());
-
-        if (starts.isEmpty() || ends.isEmpty())
-            return Optional.empty();
-
-        PriorityQueue<Node> pq = new PriorityQueue<>(Comparator.comparingInt(n -> n.weight));
-        Map<String, Integer> dist = new HashMap<>();
-        Map<String, String> parent = new HashMap<>();
-        Set<String> visited = new HashSet<>();
+        PriorityQueue<Node>  pq      = new PriorityQueue<>(Comparator.comparingInt(n -> n.weight));
+        Map<String, Integer> dist    = new HashMap<>();
+        Map<String, String>  parent  = new HashMap<>();
+        Set<String>          visited = new HashSet<>();
 
         for (String s : starts) {
             dist.put(s, 0);
@@ -324,19 +285,13 @@ public class RouteService {
 
         while (!pq.isEmpty()) {
             Node node = pq.poll();
-            if (visited.contains(node.loc))
-                continue;
+            if (visited.contains(node.loc)) continue;
             visited.add(node.loc);
 
-            if (ends.contains(node.loc)) {
-                found = node.loc;
-                break;
-            }
+            if (ends.contains(node.loc)) { found = node.loc; break; }
 
             for (Edge e : graph.get(node.loc)) {
-                int d = (e.duration == null ? 0 : e.duration);
-                int newDist = node.weight + d;
-
+                int newDist = node.weight + weightFn.apply(e);
                 if (newDist < dist.getOrDefault(e.to, Integer.MAX_VALUE)) {
                     dist.put(e.to, newDist);
                     parent.put(e.to, node.loc);
@@ -345,107 +300,70 @@ public class RouteService {
             }
         }
 
-        if (found == null)
-            return Optional.empty();
+        if (found == null) return Optional.empty();
 
-        List<String> path = new ArrayList<>();
-        String cur = found;
-        while (cur != null) {
-            path.add(cur);
-            cur = parent.get(cur);
-        }
-        Collections.reverse(path);
-
-        return Optional.of(buildSegmentDTOFromPath(path, graph, locToEntity));
+        // Pass the same weightFn into buildSegmentDTO so it picks the
+        // correct edge (min duration for fastest, min cost for cheapest)
+        // when multiple parallel edges exist between the same two stops.
+        return Optional.of(buildSegmentDTO(
+                reconstructPath(found, parent), graph, locToEntity, weightFn));
     }
 
-    // ==========================================================
-    // MINIMUM COST PATH (DIJKSTRA)
-    // ==========================================================
-    public Optional<Object> findMinCostPath(String qStop1, String qStop2) {
+    // =========================================================================
+    // HELPERS
+    // =========================================================================
 
-        if (qStop1 == null || qStop2 == null)
-            return Optional.empty();
-        String stop1 = qStop1.toLowerCase().trim();
-        String stop2 = qStop2.toLowerCase().trim();
-
-        Map<String, StopEntity> locToEntity = new HashMap<>();
-        Map<String, List<Edge>> graph = buildGraph(locToEntity);
-
-        Set<String> starts = graph.keySet().stream()
-                .filter(s -> s.contains(stop1))
+    private Set<String> matchingKeys(Map<String, List<Edge>> graph, String query) {
+        return graph.keySet().stream()
+                .filter(k -> k.contains(query))
                 .collect(Collectors.toSet());
-
-        Set<String> ends = graph.keySet().stream()
-                .filter(s -> s.contains(stop2))
-                .collect(Collectors.toSet());
-
-        if (starts.isEmpty() || ends.isEmpty())
-            return Optional.empty();
-
-        PriorityQueue<Node> pq = new PriorityQueue<>(Comparator.comparingInt(n -> n.weight));
-        Map<String, Integer> dist = new HashMap<>();
-        Map<String, String> parent = new HashMap<>();
-        Set<String> visited = new HashSet<>();
-
-        for (String s : starts) {
-            dist.put(s, 0);
-            parent.put(s, null);
-            pq.add(new Node(s, 0));
-        }
-
-        String found = null;
-
-        while (!pq.isEmpty()) {
-            Node node = pq.poll();
-            if (visited.contains(node.loc))
-                continue;
-            visited.add(node.loc);
-
-            if (ends.contains(node.loc)) {
-                found = node.loc;
-                break;
-            }
-
-            for (Edge e : graph.get(node.loc)) {
-                int c = (e.cost == null ? 0 : e.cost);
-                int newCost = node.weight + c;
-
-                if (newCost < dist.getOrDefault(e.to, Integer.MAX_VALUE)) {
-                    dist.put(e.to, newCost);
-                    parent.put(e.to, node.loc);
-                    pq.add(new Node(e.to, newCost));
-                }
-            }
-        }
-
-        if (found == null)
-            return Optional.empty();
-
-        List<String> path = new ArrayList<>();
-        String cur = found;
-        while (cur != null) {
-            path.add(cur);
-            cur = parent.get(cur);
-        }
-        Collections.reverse(path);
-
-        return Optional.of(buildSegmentDTOFromPath(path, graph, locToEntity));
     }
 
-    // ==========================================================
-    // CONVERT PATH → RouteSegmentDTO
-    // ==========================================================
-    private RouteSegmentDTO buildSegmentDTOFromPath(
+    private List<String> reconstructPath(String found, Map<String, String> parent) {
+        List<String> path = new ArrayList<>();
+        for (String cur = found; cur != null; cur = parent.get(cur))
+            path.add(cur);
+        Collections.reverse(path);
+        return path;
+    }
+
+    // =========================================================================
+    // PATH -> RouteSegmentDTO
+    //
+    // KEY FIX — parallel edges (same stops, different cost/duration):
+    //
+    //   Old code used putIfAbsent → always kept the FIRST edge regardless of
+    //   which search mode was active. So findFastestPath would find the right
+    //   PATH via Dijkstra but then buildSegmentDTO attached the wrong edge
+    //   data (first added, not fastest) → duration showed the first route's
+    //   value, not the minimum.
+    //
+    //   Fix: buildSegmentDTO now receives the same weightFn used by Dijkstra.
+    //   For each hop, it collects ALL parallel edges between u→v and picks
+    //   the one with minimum weight according to weightFn.
+    //   - findFastestPath  passes e -> e.duration  → picks min-duration edge
+    //   - findMinCostPath  passes e -> e.cost       → picks min-cost edge
+    //   - findShortestPath passes null              → picks first edge (hops only)
+    // =========================================================================
+
+    private RouteSegmentDTO buildSegmentDTO(
             List<String> path,
             Map<String, List<Edge>> graph,
-            Map<String, StopEntity> locToEntity) {
+            Map<String, StopEntity> locToEntity,
+            Function<Edge, Integer> weightFn) {   // <-- weightFn added
 
-        List<StopDTO> stopDTOs = new ArrayList<>();
+        // Build a multi-map: "u->v" -> List<Edge> (all parallel edges)
+        Map<String, List<Edge>> edgeMultiMap = new HashMap<>();
+        graph.forEach((u, edges) ->
+                edges.forEach(e -> {
+                    String key = u + "->" + e.to;
+                    edgeMultiMap.computeIfAbsent(key, k -> new ArrayList<>()).add(e);
+                })
+        );
 
-        for (String loc : path) {
+        // Stop DTOs — loc is lowercase, locToEntity is lowercase-keyed → always matches
+        List<StopDTO> stopDTOs = path.stream().map(loc -> {
             StopEntity ent = locToEntity.get(loc);
-
             StopDTO sd = new StopDTO();
             if (ent != null) {
                 sd.setLocation(ent.getLocation());
@@ -454,60 +372,50 @@ public class RouteService {
             } else {
                 sd.setLocation(loc);
             }
-            stopDTOs.add(sd);
-        }
+            return sd;
+        }).collect(Collectors.toList());
 
-        List<HopDTO> hopDTOs = new ArrayList<>();
-        int totalCost = 0;
+        // Hop DTOs — pick best parallel edge using weightFn
+        List<HopDTO> hopDTOs  = new ArrayList<>();
+        int totalCost         = 0;
+        int totalDuration     = 0;
 
         for (int i = 0; i < path.size() - 1; i++) {
-            String u = path.get(i);
-            String v = path.get(i + 1);
+            String key = path.get(i) + "->" + path.get(i + 1);
+            List<Edge> candidates = edgeMultiMap.getOrDefault(key, Collections.emptyList());
 
-            List<Edge> edges = graph.get(u).stream()
-                    .filter(e -> e.to.equals(v))
-                    .collect(Collectors.toList());
+            Edge chosen;
+            if (candidates.isEmpty()) {
+                chosen = null;
+            } else if (weightFn == null) {
+                // BFS / shortest path — just take first, weight doesn't matter
+                chosen = candidates.get(0);
+            } else {
+                // Fastest or cheapest — pick the candidate with minimum weight
+                chosen = candidates.stream()
+                        .min(Comparator.comparingInt(e -> weightFn.apply(e)))
+                        .orElse(candidates.get(0));
+            }
 
-            Edge chosen = edges.stream()
-                    .min(Comparator.comparingInt(e -> (e.cost == null ? 0 : e.cost)))
-                    .orElse(null);
-
-            int c = (chosen == null ? 0 : (chosen.cost == null ? 0 : chosen.cost));
-            int d = (chosen == null ? 0 : (chosen.duration == null ? 0 : chosen.duration));
+            int c = chosen != null ? chosen.cost     : 0;
+            int d = chosen != null ? chosen.duration : 0;
 
             HopDTO hd = new HopDTO();
             hd.setCost(c);
             hd.setDuration(d);
-            hd.setMode(chosen == null ? null : chosen.mode);
-
+            hd.setMode(chosen != null ? chosen.mode : null);
             hopDTOs.add(hd);
-            totalCost += c;
-        }
 
-        int totalDuration = hopDTOs.stream().mapToInt(h -> h.getDuration() == null ? 0 : h.getDuration()).sum();
+            totalCost     += c;
+            totalDuration += d;
+        }
 
         RouteSegmentDTO seg = new RouteSegmentDTO();
         seg.setSegmentStops(stopDTOs);
         seg.setSegmentHops(hopDTOs);
         seg.setTotalCost(totalCost);
-        seg.setTotalDuration(totalDuration); // set total duration
+        seg.setTotalDuration(totalDuration);
         seg.setStopsCount(stopDTOs.size());
-
         return seg;
     }
-
-    public List<String> getAllStopNames() {
-        List<RouteEntity> routes = routeRepository.findAll();
-
-        Set<String> names = new HashSet<>();
-
-        for (RouteEntity r : routes) {
-            for (StopEntity s : r.getStops()) {
-                names.add(s.getLocation());
-            }
-        }
-
-        return new ArrayList<>(names);
-    }
-
 }

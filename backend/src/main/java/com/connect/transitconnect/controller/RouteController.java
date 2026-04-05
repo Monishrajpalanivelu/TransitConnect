@@ -23,85 +23,94 @@ public class RouteController {
         this.routeService = routeService;
     }
 
-    // Add a new route
+    // =========================================================================
+    // ADD ROUTE
+    // POST /api/routes/add
+    // =========================================================================
     @PostMapping("/add")
     public ResponseEntity<RouteEntity> addRoute(@RequestBody RouteInputDTO dto) {
         RouteEntity saved = routeService.saveRoute(dto);
-        return ResponseEntity.ok(saved);
+        // FIX: 201 Created is more correct than 200 OK for a POST that creates a resource
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
-    // Get all routes
+    // =========================================================================
+    // GET ALL ROUTES
+    // GET /api/routes/all
+    // =========================================================================
     @GetMapping("/all")
     public ResponseEntity<List<RouteEntity>> getAll() {
         return ResponseEntity.ok(routeService.getAllRoutes());
     }
 
-    /**
-     * SEARCH endpoint (smartSearch removed)
-     * Default mode = SHORTEST
-     *
-     * Examples:
-     * GET /api/routes/search?stop1=m&stop2=e
-     * GET /api/routes/search?stop1=m&stop2=e&mode=cheapest
-     */
+    // =========================================================================
+    // SEARCH
+    // GET /api/routes/search?stop1=x&stop2=y&mode=shortest|fastest|cheapest
+    //
+    // FIX: result type changed from Optional<Object> → Optional<RouteSegmentDTO>
+    //      to match the updated RouteService return types.
+    // =========================================================================
     @GetMapping("/search")
     public ResponseEntity<?> search(
             @RequestParam("stop1") String stop1,
             @RequestParam("stop2") String stop2,
-            @RequestParam(value = "mode", required = false) String mode) {
+            @RequestParam(value = "mode", required = false, defaultValue = "shortest") String mode) {
 
         // Validation
-        if (stop1 == null || stop1.trim().isEmpty() ||
-                stop2 == null || stop2.trim().isEmpty()) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "stop1 and stop2 are required"));
+        if (stop1.trim().isEmpty() || stop2.trim().isEmpty()) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(Map.of("message", "stop1 and stop2 must not be blank"));
         }
 
-        Optional<Object> result;
-
-        // DEFAULT = shortest path
-        if (mode == null || mode.isEmpty()) {
-            result = routeService.findShortestPath(stop1, stop2);
-        } else {
-            switch (mode.toLowerCase().trim()) {
-                case "cheapest":
-                case "minimum-cost":
-                case "mincost":
-                    result = routeService.findMinCostPath(stop1, stop2);
-                    break;
-
-                case "shortest":
-                    result = routeService.findShortestPath(stop1, stop2);
-                    break;
-
-                case "fastest":
-                    result = routeService.findFastestPath(stop1, stop2);
-                    break;
-
-                default:
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                            .body(Map.of("message",
-                                    "Invalid mode. Allowed: shortest (default), cheapest"));
+        // FIX: type is now Optional<RouteSegmentDTO> — not Optional<Object>
+        Optional<RouteSegmentDTO> result = switch (mode.toLowerCase().trim()) {
+            case "fastest"                      -> routeService.findFastestPath(stop1, stop2);
+            case "cheapest", "mincost",
+                 "minimum-cost"                 -> routeService.findMinCostPath(stop1, stop2);
+            case "shortest"                     -> routeService.findShortestPath(stop1, stop2);
+            default -> {
+                // FIX: return 400 immediately for invalid mode — no need to run any search
+                yield null;
             }
+        };
+
+        // Handle invalid mode (null from default branch above)
+        if (result == null) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(Map.of(
+                            "message", "Invalid mode. Allowed values: shortest (default), fastest, cheapest"));
         }
 
+        // FIX: return 404 with a clear message instead of 200 with an empty list
+        // An empty list is misleading — the route simply was not found
         if (result.isEmpty()) {
-            return ResponseEntity.ok(List.of()); // empty result
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message",
+                            "No route found between '" + stop1 + "' and '" + stop2 + "'"));
         }
 
         return ResponseEntity.ok(result.get());
     }
 
-    // Delete route
+    // =========================================================================
+    // DELETE ROUTE
+    // DELETE /api/routes/{id}
+    // =========================================================================
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         routeService.deleteRoute(id);
         return ResponseEntity.noContent().build();
     }
 
+    // =========================================================================
+    // GET ALL STOP NAMES
+    // GET /api/routes/stops
+    // =========================================================================
     @GetMapping("/stops")
     public ResponseEntity<List<String>> getAllStops() {
         return ResponseEntity.ok(routeService.getAllStopNames());
     }
-
 }
