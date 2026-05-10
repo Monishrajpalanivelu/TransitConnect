@@ -15,12 +15,14 @@ export default function Dashboard() {
       const [result, setResult] = useState(null);
       const [showAdd, setShowAdd] = useState(false);
       const [error, setError] = useState("");
+      const [vehicle, setVehicle] = useState("car");
       const navigate = useNavigate();
 
       // handleSearch now accepts mode (from SearchBar)
-      const handleSearch = async (from, to, mode = "shortest") => {
+      const handleSearch = async (from, to, mode = "shortest", vehicleType = "car") => {
             setError("");
             setResult(null);
+            setVehicle(vehicleType);
 
             if (!from || !to) {
                   alert("Enter both fields");
@@ -59,7 +61,7 @@ export default function Dashboard() {
                         {!showAdd && error && <div style={{ color: "red", marginTop: 8 }}>{error}</div>}
 
                         {/* Results */}
-                        {!showAdd && result && <RouteCard data={result} />}
+                        {!showAdd && result && <RouteCard data={result} vehicle={vehicle} />}
 
                         {/* Add Route */}
                         {showAdd && <AddRouteModal onClose={() => setShowAdd(false)} />}

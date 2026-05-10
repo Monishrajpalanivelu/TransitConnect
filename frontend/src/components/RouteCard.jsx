@@ -3,7 +3,7 @@
 import { styles } from "../styles/styles";
 import MapView from "./MapView";
 
-export default function RouteCard({ data }) {
+export default function RouteCard({ data, vehicle }) {
   if (!data) return null;
 
   // case: empty array → no route found
@@ -36,7 +36,7 @@ export default function RouteCard({ data }) {
         </div>
 
         {/* MAP VIEW FOR SEGMENT */}
-        <MapView stops={stops} hops={hops} />
+        <MapView stops={stops} hops={hops} vehicle={vehicle} />
 
         <div style={{ marginTop: 20 }}>
           <strong>Total Cost:</strong> ₹{data.totalCost} <br />
@@ -78,7 +78,7 @@ export default function RouteCard({ data }) {
       </div>
 
       {/* MAP VIEW FOR FULL ROUTE */}
-      <MapView stops={stops} hops={hops} />
+      <MapView stops={stops} hops={hops} vehicle={vehicle} />
 
       <div style={{ marginTop: 20 }}>
         <strong>Total Cost:</strong> ₹{totalCost} <br />

@@ -6,6 +6,7 @@ export default function SearchBar({ onSearch }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [mode, setMode] = useState("shortest");
+  const [vehicle, setVehicle] = useState("car"); // Default to car
 
   const [allStops, setAllStops] = useState([]);
   const [fromSug, setFromSug] = useState([]);
@@ -106,9 +107,37 @@ export default function SearchBar({ onSearch }) {
           </label>
         </div>
 
+        {/* VEHICLE TYPE */}
+        <div style={{ display: "flex", gap: 12 }}>
+            <label>
+                <input
+                    type="radio"
+                    value="car"
+                    checked={vehicle === "car"}
+                    onChange={() => setVehicle("car")}
+                /> Car
+            </label>
+            <label>
+                <input
+                    type="radio"
+                    value="bike"
+                    checked={vehicle === "bike"}
+                    onChange={() => setVehicle("bike")}
+                /> Bike
+            </label>
+            <label>
+                <input
+                    type="radio"
+                    value="walking"
+                    checked={vehicle === "walking"}
+                    onChange={() => setVehicle("walking")}
+                /> Walking
+            </label>
+        </div>
+
         <button
           style={styles.blueBtn}
-          onClick={() => onSearch(from, to, mode)}
+          onClick={() => onSearch(from, to, mode, vehicle)}
         >
           Search Route
         </button>

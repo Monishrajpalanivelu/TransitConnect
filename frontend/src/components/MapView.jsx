@@ -14,7 +14,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl,
 });
 
-export default function MapView({ stops = [], hops = [] }) {
+export default function MapView({ stops = [], hops = [], vehicle = "car" }) {
   const [routeGeometry, setRouteGeometry] = useState([]);
 
   const validStops = stops.filter(s => s.latitude && s.longitude);
@@ -29,7 +29,8 @@ export default function MapView({ stops = [], hops = [] }) {
             .map(s => `${s.longitude},${s.latitude}`)
             .join(';');
 
-          const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${coordinatesString}?overview=full&geometries=geojson`);
+          const profile = vehicle === "car" ? "driving" : (vehicle === "bike" ? "bike" : "foot");
+          const res = await fetch(`https://router.project-osrm.org/route/v1/${profile}/${coordinatesString}?overview=full&geometries=geojson`);
           const data = await res.json();
 
           if (data.routes && data.routes.length > 0) {
@@ -50,7 +51,7 @@ export default function MapView({ stops = [], hops = [] }) {
 
     fetchRoute();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(stops)]);
+  }, [JSON.stringify(stops), vehicle]);
 
   const center = coords.length ? coords[0] : [12.9716, 77.5946];
 
