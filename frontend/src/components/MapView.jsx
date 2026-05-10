@@ -14,7 +14,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl,
 });
 
-export default function MapView({ stops = [], hops = [] }) {
+export default function MapView({ stops = [], hops = [], darkMode = false }) {
   const [routeGeometry, setRouteGeometry] = useState([]);
 
   const validStops = stops.filter(s => s.latitude && s.longitude);
@@ -57,10 +57,17 @@ export default function MapView({ stops = [], hops = [] }) {
   return (
     <div style={{ height: 350, width: "100%", marginTop: 20 }}>
       <MapContainer center={center} zoom={12} style={{ height: "100%", width: "100%" }}>
-        <TileLayer
-          attribution='© OpenStreetMap contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        {darkMode ? (
+          <TileLayer
+            attribution='© OpenStreetMap contributors, CartoDB'
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          />
+        ) : (
+          <TileLayer
+            attribution='© OpenStreetMap contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+        )}
 
         {/* Markers */}
         {stops.map((stop, idx) => (
@@ -81,7 +88,7 @@ export default function MapView({ stops = [], hops = [] }) {
 
         {/* Polyline Route */}
         {routeGeometry.length > 1 && (
-          <Polyline positions={routeGeometry} color="#1E74D6" weight={5} />
+          <Polyline positions={routeGeometry} color={darkMode ? "#4DA8FF" : "#1E74D6"} weight={5} />
         )}
       </MapContainer>
     </div>

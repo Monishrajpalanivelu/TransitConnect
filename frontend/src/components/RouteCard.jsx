@@ -3,13 +3,19 @@
 import { styles } from "../styles/styles";
 import MapView from "./MapView";
 
-export default function RouteCard({ data }) {
+export default function RouteCard({ data, darkMode = false }) {
+  const cardStyle = {
+    ...styles.card,
+    background: darkMode ? '#1e1e1e' : styles.card.background,
+    color: darkMode ? '#fff' : '#000',
+  };
+
   if (!data) return null;
 
   // case: empty array → no route found
   if (Array.isArray(data) && data.length === 0) {
     return (
-      <div style={styles.card}>
+      <div style={cardStyle}>
         <h3 style={{ color: "red" }}>No Route Found</h3>
       </div>
     );
@@ -23,8 +29,8 @@ export default function RouteCard({ data }) {
     const hops = data.segmentHops;
 
     return (
-      <div style={styles.card}>
-        <h3 style={{ color: "#1E74D6" }}>Segment Route</h3>
+      <div style={cardStyle}>
+        <h3 style={{ color: darkMode ? "#4DA8FF" : "#1E74D6" }}>Segment Route</h3>
 
         <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
           {stops.map((stop, index) => (
@@ -36,7 +42,7 @@ export default function RouteCard({ data }) {
         </div>
 
         {/* MAP VIEW FOR SEGMENT */}
-        <MapView stops={stops} hops={hops} />
+        <MapView stops={stops} hops={hops} darkMode={darkMode} />
 
         <div style={{ marginTop: 20 }}>
           <strong>Total Cost:</strong> ₹{data.totalCost} <br />
@@ -53,7 +59,7 @@ export default function RouteCard({ data }) {
   const route = Array.isArray(data) ? data[0] : data;
   if (!route || !route.stops) {
     return (
-      <div style={styles.card}>
+      <div style={cardStyle}>
         <h3 style={{ color: "red" }}>No Route Found</h3>
       </div>
     );
@@ -65,8 +71,8 @@ export default function RouteCard({ data }) {
   const totalDuration = hops.reduce((sum, h) => sum + (h.duration || 0), 0);
 
   return (
-    <div style={styles.card}>
-      <h3 style={{ color: "#1E74D6" }}>Full Route</h3>
+    <div style={cardStyle}>
+      <h3 style={{ color: darkMode ? "#4DA8FF" : "#1E74D6" }}>Full Route</h3>
 
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
         {stops.map((stop, index) => (
@@ -78,7 +84,7 @@ export default function RouteCard({ data }) {
       </div>
 
       {/* MAP VIEW FOR FULL ROUTE */}
-      <MapView stops={stops} hops={hops} />
+      <MapView stops={stops} hops={hops} darkMode={darkMode} />
 
       <div style={{ marginTop: 20 }}>
         <strong>Total Cost:</strong> ₹{totalCost} <br />

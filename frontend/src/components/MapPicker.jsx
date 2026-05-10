@@ -24,7 +24,7 @@ function ClickHandler({ onSelect }) {
   return null;
 }
 
-export default function MapPicker({ lat, lng, onChange }) {
+export default function MapPicker({ lat, lng, onChange, darkMode = false }) {
   const [position, setPosition] = useState(
     lat && lng ? [lat, lng] : [12.9716, 77.5946] // default Bangalore
   );
@@ -41,10 +41,17 @@ export default function MapPicker({ lat, lng, onChange }) {
         zoom={13}
         style={{ height: "100%", width: "100%" }}
       >
-        <TileLayer
-          attribution='© OpenStreetMap contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        {darkMode ? (
+          <TileLayer
+            attribution='© OpenStreetMap contributors, CartoDB'
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          />
+        ) : (
+          <TileLayer
+            attribution='© OpenStreetMap contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+        )}
 
         <ClickHandler onSelect={handleSelect} />
 

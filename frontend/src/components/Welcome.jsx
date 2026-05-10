@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { styles } from "../styles/styles";
 
-export default function Welcome() {
+export default function Welcome({ darkMode = false }) {
   const [isOpen, setIsOpen] = useState(true);
 
   if (!isOpen) {
@@ -13,10 +13,11 @@ export default function Welcome() {
           padding: "10px",
           textAlign: "center",
           cursor: "pointer",
-          backgroundColor: "#e0f2fe",
+          backgroundColor: darkMode ? "#1e3a8a" : "#e0f2fe",
+          color: darkMode ? "#93c5fd" : "#0284c7",
           marginBottom: 15,
-          color: "#0284c7",
-          fontWeight: "bold"
+          fontWeight: "bold",
+          border: darkMode ? "1px solid #1e40af" : "none"
         }}
       >
         👋 New to TransitConnect? Click to read guidelines
@@ -25,7 +26,7 @@ export default function Welcome() {
   }
 
   return (
-    <div style={{ ...styles.card, marginBottom: 20 }}>
+    <div style={{ ...styles.card, marginBottom: 20, background: darkMode ? '#1e1e1e' : '#fff', color: darkMode ? '#fff' : '#000' }}>
       <div
         style={{
           display: "flex",
@@ -42,7 +43,7 @@ export default function Welcome() {
             border: "none",
             fontSize: "18px",
             cursor: "pointer",
-            color: "#666"
+            color: darkMode ? "#bbb" : "#666"
           }}
         >
           ✖
@@ -90,7 +91,8 @@ export default function Welcome() {
 
         <div
           style={{
-            background: "#fef2f2",
+            background: darkMode ? "#450a0a" : "#fef2f2",
+            color: darkMode ? "#fca5a5" : "inherit",
             padding: 10,
             borderRadius: 6,
             marginTop: 12

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { styles } from "../styles/styles";
 import { fetchStops } from "../services/api";
 
-export default function SearchBar({ onSearch }) {
+export default function SearchBar({ onSearch, darkMode = false }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [mode, setMode] = useState("shortest");
@@ -26,14 +26,34 @@ export default function SearchBar({ onSearch }) {
     );
   };
 
+  const cardStyle = {
+    ...styles.card,
+    background: darkMode ? '#1e1e1e' : styles.card.background,
+    color: darkMode ? '#fff' : '#000',
+  };
+
+  const inputStyle = {
+    ...styles.input,
+    background: darkMode ? '#333' : styles.input.background,
+    color: darkMode ? '#fff' : '#000',
+    border: darkMode ? '1px solid #555' : styles.input.border,
+  };
+
+  const dropdownStyle = {
+    background: darkMode ? '#333' : '#fff',
+    border: darkMode ? '1px solid #555' : '1px solid #ccc',
+    borderRadius: 6,
+    color: darkMode ? '#fff' : '#000'
+  };
+
   return (
-    <div style={styles.card}>
+    <div style={cardStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 
         {/* FROM INPUT */}
         <div>
           <input
-            style={styles.input}
+            style={inputStyle}
             placeholder="From"
             value={from}
             onChange={(e) => {
@@ -42,10 +62,10 @@ export default function SearchBar({ onSearch }) {
             }}
           />
           {fromSug.length > 0 && (
-            <div style={{ background: "#fff", border: "1px solid #ccc", borderRadius: 6 }}>
+            <div style={dropdownStyle}>
               {fromSug.map((s, i) => (
                 <div key={i}
-                  style={{ padding: 6, cursor: "pointer" }}
+                  style={{ padding: 6, cursor: "pointer", borderBottom: i < fromSug.length - 1 ? (darkMode ? '1px solid #444' : '1px solid #eee') : 'none' }}
                   onClick={() => { setFrom(s); setFromSug([]); }}>
                   {s}
                 </div>
@@ -57,7 +77,7 @@ export default function SearchBar({ onSearch }) {
         {/* TO INPUT */}
         <div>
           <input
-            style={styles.input}
+            style={inputStyle}
             placeholder="To"
             value={to}
             onChange={(e) => {
@@ -66,10 +86,10 @@ export default function SearchBar({ onSearch }) {
             }}
           />
           {toSug.length > 0 && (
-            <div style={{ background: "#fff", border: "1px solid #ccc", borderRadius: 6 }}>
+            <div style={dropdownStyle}>
               {toSug.map((s, i) => (
                 <div key={i}
-                  style={{ padding: 6, cursor: "pointer" }}
+                  style={{ padding: 6, cursor: "pointer", borderBottom: i < toSug.length - 1 ? (darkMode ? '1px solid #444' : '1px solid #eee') : 'none' }}
                   onClick={() => { setTo(s); setToSug([]); }}>
                   {s}
                 </div>
