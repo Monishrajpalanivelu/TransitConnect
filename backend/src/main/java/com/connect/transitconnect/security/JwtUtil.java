@@ -15,7 +15,7 @@ import java.util.Date;
 public class JwtUtil {
 
     // 🔐 Load secret from environment / application properties
-    @Value("${JWT_SECRET}")
+    @Value("${jwt.secret}")
     private String secret;
 
     private static final long EXPIRATION_TIME = 1000 * 60 * 30; // 30 minutes

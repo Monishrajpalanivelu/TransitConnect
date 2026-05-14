@@ -9,11 +9,11 @@ export default function AddRouteModal({ onClose }) {
     { location: "", latitude: null, longitude: null }
   ]);
 
-  const [hops, setHops] = useState([{ cost: 0, duration: 0, mode: "Bus" }]);
+  const [hops, setHops] = useState([{ cost: "", duration: "", mode: "Bus" }]);
 
   const addStop = () => {
     setStops(prev => [...prev, { location: "", latitude: null, longitude: null }]);
-    setHops(prev => [...prev, { cost: 0, duration: 0, mode: "Bus" }]);
+    setHops(prev => [...prev, { cost: "", duration: "", mode: "Bus" }]);
   };
 
   const updateStop = (idx, key, val) =>
@@ -25,9 +25,13 @@ export default function AddRouteModal({ onClose }) {
   const submit = async () => {
     // Validation
     for (let s of stops) {
-      if (!s.location) return alert("Each stop must have a name");
+      if (!s.location || !s.location.trim()) return alert("Each stop must have a name");
       if (s.latitude == null || s.longitude == null)
         return alert("Each stop must be selected on the map!");
+    }
+    for (let h of hops) {
+      if (h.cost === "" || h.cost <= 0) return alert("Please enter a valid cost (greater than 0) for all hops");
+      if (h.duration === "" || h.duration <= 0) return alert("Please enter a valid duration (greater than 0) for all hops");
     }
 
     const payload = { stops, hops };
@@ -73,8 +77,8 @@ export default function AddRouteModal({ onClose }) {
                   style={{ width: 100 }}
                   min="0"
                   value={hops[i].cost}
-                  placeholder="0"
-                  onChange={(e) => updateHop(i, "cost", Math.max(0, Number(e.target.value)))}
+                  placeholder="Cost"
+                  onChange={(e) => updateHop(i, "cost", e.target.value === "" ? "" : Number(e.target.value))}
                 />
               </div>
 
@@ -85,8 +89,8 @@ export default function AddRouteModal({ onClose }) {
                   style={{ width: 100 }}
                   min="0"
                   value={hops[i].duration}
-                  placeholder="0"
-                  onChange={(e) => updateHop(i, "duration", Math.max(0, Number(e.target.value)))}
+                  placeholder="Duration"
+                  onChange={(e) => updateHop(i, "duration", e.target.value === "" ? "" : Number(e.target.value))}
                 />
               </div>
 

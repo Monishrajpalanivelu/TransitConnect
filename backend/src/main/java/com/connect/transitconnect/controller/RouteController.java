@@ -4,17 +4,21 @@ import com.connect.transitconnect.dto.RouteInputDTO;
 import com.connect.transitconnect.dto.RouteSegmentDTO;
 import com.connect.transitconnect.entity.RouteEntity;
 import com.connect.transitconnect.service.RouteService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import com.connect.transitconnect.dto.RouteResponseDTO;
 
 @RestController
 @RequestMapping("/api/routes")
-@CrossOrigin(origins = { "http://localhost:3000", "https://transitconnect-production.up.railway.app" })
 public class RouteController {
 
     private final RouteService routeService;
@@ -28,10 +32,13 @@ public class RouteController {
     // POST /api/routes/add
     // =========================================================================
     @PostMapping("/add")
-    public ResponseEntity<RouteEntity> addRoute(@RequestBody RouteInputDTO dto) {
-        RouteEntity saved = routeService.saveRoute(dto);
-        // FIX: 201 Created is more correct than 200 OK for a POST that creates a resource
-        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+    public ResponseEntity<Map<String, Object>> addRoute(@Valid @RequestBody RouteInputDTO dto,
+                                                Authentication auth) {
+        RouteEntity saved = routeService.saveRoute(dto,auth.getName());
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "message", "Route created successfully",
+                "routeId", saved.getId()
+        ));
     }
 
     // =========================================================================
@@ -39,8 +46,8 @@ public class RouteController {
     // GET /api/routes/all
     // =========================================================================
     @GetMapping("/all")
-    public ResponseEntity<List<RouteEntity>> getAll() {
-        return ResponseEntity.ok(routeService.getAllRoutes());
+    public ResponseEntity<Page<RouteResponseDTO>> getAll(Pageable pageable) {
+        return ResponseEntity.ok(routeService.getAllRoutes(pageable));
     }
 
     // =========================================================================
@@ -63,36 +70,42 @@ public class RouteController {
                     .body(Map.of("message", "stop1 and stop2 must not be blank"));
         }
 
-        // FIX: type is now Optional<RouteSegmentDTO> — not Optional<Object>
-        Optional<RouteSegmentDTO> result = switch (mode.toLowerCase().trim()) {
-            case "fastest"                      -> routeService.findFastestPath(stop1, stop2);
-            case "cheapest", "mincost",
-                 "minimum-cost"                 -> routeService.findMinCostPath(stop1, stop2);
-            case "shortest"                     -> routeService.findShortestPath(stop1, stop2);
-            default -> {
-                // FIX: return 400 immediately for invalid mode — no need to run any search
-                yield null;
-            }
-        };
-
-        // Handle invalid mode (null from default branch above)
-        if (result == null) {
+        if (stop1.trim().equalsIgnoreCase(stop2.trim())) {
             return ResponseEntity
+                    .badRequest()
+                    .body(Map.of("message", "Source and destination stops cannot be the same"));
+        }
+
+        // FIX: type is now RouteSegmentDTO directly (to avoid Redis JSON Optional serialization bugs)
+        RouteSegmentDTO result = null;
+        switch (mode.toLowerCase().trim()) {
+            case "fastest":
+                result = routeService.findFastestPath(stop1, stop2);
+                break;
+            case "cheapest":
+            case "mincost":
+            case "minimum-cost":
+                result = routeService.findMinCostPath(stop1, stop2);
+                break;
+            case "shortest":
+                result = routeService.findShortestPath(stop1, stop2);
+                break;
+            default:
+                return ResponseEntity
                     .badRequest()
                     .body(Map.of(
                             "message", "Invalid mode. Allowed values: shortest (default), fastest, cheapest"));
         }
 
-        // FIX: return 404 with a clear message instead of 200 with an empty list
-        // An empty list is misleading — the route simply was not found
-        if (result.isEmpty()) {
+        // FIX: return 404 with a clear message if no route was found (result is null)
+        if (result == null) {
             return ResponseEntity
                     .status(HttpStatus.NOT_FOUND)
                     .body(Map.of("message",
                             "No route found between '" + stop1 + "' and '" + stop2 + "'"));
         }
 
-        return ResponseEntity.ok(result.get());
+        return ResponseEntity.ok(result);
     }
 
     // =========================================================================

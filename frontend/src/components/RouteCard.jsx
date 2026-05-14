@@ -15,16 +15,13 @@ export default function RouteCard({ data }) {
     );
   }
 
-  // ============================
-  // SEGMENT ROUTE (Shortest/Cheapest)
-  // ============================
   if (data.segmentStops && data.segmentHops) {
     const stops = data.segmentStops;
     const hops = data.segmentHops;
 
     return (
       <div style={styles.card}>
-        <h3 style={{ color: "#1E74D6" }}>Segment Route</h3>
+        <h3 style={{ color: "#1E74D6" }}>Route Details</h3>
 
         <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
           {stops.map((stop, index) => (
@@ -35,7 +32,7 @@ export default function RouteCard({ data }) {
           ))}
         </div>
 
-        {/* MAP VIEW FOR SEGMENT */}
+        {/* MAP VIEW */}
         <MapView stops={stops} hops={hops} />
 
         <div style={{ marginTop: 20 }}>
@@ -47,44 +44,9 @@ export default function RouteCard({ data }) {
     );
   }
 
-  // ============================
-  // FULL ROUTE (legacy smartSearch full route)
-  // ============================
-  const route = Array.isArray(data) ? data[0] : data;
-  if (!route || !route.stops) {
-    return (
-      <div style={styles.card}>
-        <h3 style={{ color: "red" }}>No Route Found</h3>
-      </div>
-    );
-  }
-
-  const stops = route.stops;
-  const hops = route.hops || [];
-  const totalCost = hops.reduce((sum, h) => sum + (h.cost || 0), 0);
-  const totalDuration = hops.reduce((sum, h) => sum + (h.duration || 0), 0);
-
   return (
     <div style={styles.card}>
-      <h3 style={{ color: "#1E74D6" }}>Full Route</h3>
-
-      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
-        {stops.map((stop, index) => (
-          <div key={index} style={{ display: "flex", alignItems: "center" }}>
-            <strong style={{ fontSize: 16 }}>{stop.location}</strong>
-            {index < hops.length && <Hop hop={hops[index]} />}
-          </div>
-        ))}
-      </div>
-
-      {/* MAP VIEW FOR FULL ROUTE */}
-      <MapView stops={stops} hops={hops} />
-
-      <div style={{ marginTop: 20 }}>
-        <strong>Total Cost:</strong> ₹{totalCost} <br />
-        <strong>Total Duration:</strong> {totalDuration} mins <br />
-        <strong>Total Stops:</strong> {stops.length}
-      </div>
+      <h3 style={{ color: "red" }}>No Route Found</h3>
     </div>
   );
 }

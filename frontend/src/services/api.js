@@ -23,8 +23,19 @@ async function handleResponse(res) {
   }
 
   if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(errorText || "Request failed");
+    let errorText = "Request failed";
+    try {
+      const text = await res.text();
+      try {
+        const json = JSON.parse(text);
+        errorText = json.message || json.error || text || errorText;
+      } catch (e) {
+        errorText = text || errorText;
+      }
+    } catch (e) {
+      // ignore
+    }
+    throw new Error(errorText);
   }
 
   return res.json();

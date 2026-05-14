@@ -43,6 +43,7 @@ public class SecurityConfig {
                 .requestMatchers("/error").permitAll() 
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/auth/**").permitAll()
+                .requestMatchers("/actuator/**").permitAll()
                 .anyRequest().authenticated()
             )
             .sessionManagement(session ->

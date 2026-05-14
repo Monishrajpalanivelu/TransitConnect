@@ -1,5 +1,8 @@
 package com.connect.transitconnect.dto;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 
 import java.util.List;
@@ -8,6 +11,12 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RouteInputDTO {
-    private List<StopDTO> stops; // length N
-    private List<HopDTO> hops;   // length N-1: hop i is from stops[i] -> stops[i+1]
+    @NotEmpty(message = "Route must contain at least 2 stops")
+    @Size(min = 2, message = "Route must contain at least 2 stops")
+    @Valid
+    private List<StopDTO> stops;
+
+    @NotEmpty(message = "Route must contain at least 1 hop")
+    @Valid
+    private List<HopDTO> hops;
 }

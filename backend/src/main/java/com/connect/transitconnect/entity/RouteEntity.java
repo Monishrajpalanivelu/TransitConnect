@@ -2,11 +2,19 @@ package com.connect.transitconnect.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
 
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "routes")
+@Table(
+        name = "routes",
+        indexes = {
+                @Index(name = "idx_route_created_by", columnList = "created_by")
+        }
+)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -16,13 +24,41 @@ public class RouteEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Keep insertion order: stops[0] -> stops[1] -> ...
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "route_id")
-    private List<StopEntity> stops;
+    @Column(name = "created_by")
+    private String createdBy;
 
-    // hops[i] corresponds to stops[i] -> stops[i+1]
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "route_id")
-    private List<HopEntity> hops;
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private Instant createdAt;
+    /**
+     * ManyToMany — one Stop can belong to many Routes.
+     * @OrderColumn preserves ordered sequence in join table.
+     * No CascadeType — stops have their own lifecycle (shared).
+     */
+    @ManyToMany
+    @JoinTable(
+            name = "route_stops",
+            joinColumns = @JoinColumn(name = "route_id"),
+            inverseJoinColumns = @JoinColumn(name = "stop_id"),
+            indexes = {
+                    @Index(name = "idx_route_stops_route", columnList = "route_id"),
+                    @Index(name = "idx_route_stops_stop",  columnList = "stop_id")
+            }
+    )
+    @OrderColumn(name = "stop_sequence")
+    @org.hibernate.annotations.BatchSize(size = 20)
+    private List<StopEntity> stops = new ArrayList<>();
+
+    /**
+     * Hops are owned by route — cascade ALL + orphanRemoval.
+     */
+    @OneToMany(
+            mappedBy = "route",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY
+    )
+    @OrderBy("sequenceOrder ASC")
+    @org.hibernate.annotations.BatchSize(size = 20)
+    private List<HopEntity> hops = new ArrayList<>();
 }
