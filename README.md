@@ -38,8 +38,9 @@ By mapping individual connections as reported by the community, TransitConnect c
 * **Java 17 & Spring Boot 3:** Robust core application framework with production-ready features.
 * **Spring Security:** Stateless authentication using **JWT (JSON Web Tokens)** with custom filter chain.
 * **Spring Data JPA:** For efficient ORM and data persistence with eager/lazy loading optimization.
-* **PostgreSQL:** Relational database for storing complex transit nodes and relationships with indexed queries.
-* **Spring Caching:** @Cacheable and @CacheEvict for route optimization results to reduce database load.
+* **MySQL:** Relational database for storing complex transit nodes and relationships with indexed queries.
+* **Spring Data Redis:** Caching layer for high-performance route optimization queries.
+* **Spring Cache:** @Cacheable and @CacheEvict for route results to reduce database load.
 
 ---
 
@@ -55,6 +56,7 @@ By mapping individual connections as reported by the community, TransitConnect c
 - **JOIN FETCH queries**: Single database query to load all hops with their related stops, preventing N+1 query issues
 - **Indexed lookups**: Database indexes on stop locations, hop foreign keys, and route creation metadata
 - **Result caching**: Spring Cache abstraction for shortest/fastest/cheapest path queries
+- **Redis integration**: Secondary caching for distributed deployments
 
 ### **Search Algorithms**
 - **BFS (Breadth-First Search)**: Finds the shortest path by minimum number of hops
@@ -65,6 +67,7 @@ By mapping individual connections as reported by the community, TransitConnect c
 - **JWT-based stateless authentication**: Reduces server state while maintaining user session integrity
 - **Dynamic CORS handling**: Configured to support secure communication across cloud environments and Netlify deploy previews
 - **SPA-optimized routing**: Custom configurations to handle browser refreshes and direct URL navigation without server-side errors
+- **Rate limiting**: Bucket4j integration for API rate limiting and DDoS protection
 
 ---
 
@@ -82,7 +85,7 @@ TransitConnect/
 │   │   ├── repository/      # Spring Data JPA Repositories
 │   │   └── TransitconnectApplication.java  # Spring Boot entry point
 │   ├── pom.xml              # Maven dependencies & build config
-│   └── application.properties # Database & JWT configuration
+│   └── src/main/resources/application.properties # Database & JWT configuration
 └── frontend/                             (React/JavaScript - 34.8%)
     ├── public/              # Redirects & static assets
     ├── src/
@@ -124,7 +127,7 @@ TransitConnect/
 
 ### **Prerequisites**
 - Java 17 or higher
-- PostgreSQL 12+
+- MySQL 8.0+
 - Node.js 16+ and npm
 
 ### **1. Clone the Repository**
@@ -136,14 +139,18 @@ cd TransitConnect
 ### **2. Backend Setup**
 
 1. **Configure Database**
-   - Create a PostgreSQL database (e.g., `transitconnect`)
+   - Create a MySQL database (e.g., `transitconnect`)
    - Update `backend/src/main/resources/application.properties`:
      ```properties
-     spring.datasource.url=jdbc:postgresql://localhost:5432/transitconnect
-     spring.datasource.username=postgres
+     spring.datasource.url=jdbc:mysql://localhost:3306/transitconnect
+     spring.datasource.username=root
      spring.datasource.password=yourpassword
+     spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
      spring.jpa.hibernate.ddl-auto=update
+     spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect
      jwt.secret=your-secret-key-min-32-chars
+     spring.redis.host=localhost
+     spring.redis.port=6379
      ```
 
 2. **Build & Run**
