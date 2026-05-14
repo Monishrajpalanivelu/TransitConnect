@@ -26,14 +26,14 @@ By mapping individual connections as reported by the community, TransitConnect c
 
 ##  🛠️ Tech Stack
 
-### **Frontend** (34.8%)
+### **Frontend**
 
 * **React.js:** Functional components and Hooks for dynamic state management.
 * **Axios:** For asynchronous API communication with request/response interceptors.
 * **React Router:** For seamless Single Page Application (SPA) navigation.
 * **Tailwind CSS:** For a modern, responsive, and accessible user interface.
 
-### **Backend** (62.6%)
+### **Backend** 
 
 * **Java 17 & Spring Boot 3:** Robust core application framework with production-ready features.
 * **Spring Security:** Stateless authentication using **JWT (JSON Web Tokens)** with custom filter chain.
