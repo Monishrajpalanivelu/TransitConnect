@@ -31,7 +31,7 @@ export default function SearchBar({ onSearch }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 
         {/* FROM INPUT */}
-        <div>
+        <div style={{ position: "relative" }}>
           <input
             style={styles.input}
             placeholder="From"
@@ -42,7 +42,7 @@ export default function SearchBar({ onSearch }) {
             }}
           />
           {fromSug.length > 0 && (
-            <div style={{ background: "#fff", border: "1px solid #ccc", borderRadius: 6 }}>
+            <div style={{ background: "#fff", border: "1px solid #ccc", borderRadius: 6, position: "absolute", zIndex: 10, width: "100%", marginTop: 4 }}>
               {fromSug.map((s, i) => (
                 <div key={i}
                   style={{ padding: 6, cursor: "pointer" }}
@@ -55,7 +55,7 @@ export default function SearchBar({ onSearch }) {
         </div>
 
         {/* TO INPUT */}
-        <div>
+        <div style={{ position: "relative" }}>
           <input
             style={styles.input}
             placeholder="To"
@@ -66,7 +66,7 @@ export default function SearchBar({ onSearch }) {
             }}
           />
           {toSug.length > 0 && (
-            <div style={{ background: "#fff", border: "1px solid #ccc", borderRadius: 6 }}>
+            <div style={{ background: "#fff", border: "1px solid #ccc", borderRadius: 6, position: "absolute", zIndex: 10, width: "100%", marginTop: 4 }}>
               {toSug.map((s, i) => (
                 <div key={i}
                   style={{ padding: 6, cursor: "pointer" }}

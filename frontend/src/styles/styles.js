@@ -35,9 +35,11 @@ export const styles = {
     position: "fixed",
     left: 0,
     right: 0,
-    bottom: 12,
+    bottom: 0,
+    paddingBottom: 12,
     display: "flex",
     justifyContent: "center",
+    pointerEvents: "none",
   },
   navBar: {
     width: 360,
@@ -47,6 +49,7 @@ export const styles = {
     display: "flex",
     justifyContent: "space-around",
     boxShadow: "0 8px 24px rgba(0, 45, 90, 0.15)",
+    pointerEvents: "auto",
   },
   navBtn: {
     background: "transparent",

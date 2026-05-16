@@ -85,7 +85,7 @@ export default function Welcome() {
         <ul style={{ paddingLeft: 20 }}>
           <li>❓Is this route real and currently usable?</li>
           <li>❓Have I personally verified this?</li>
-          <li>❓ill this genuinely help someone else?</li>
+          <li>❓Will this genuinely help someone else?</li>
         </ul>
 
         <div
