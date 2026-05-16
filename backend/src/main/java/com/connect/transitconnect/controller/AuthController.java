@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/auth")
-@CrossOrigin(origins = { "http://localhost:3000", "https://transitconnect-production.up.railway.app" })
 public class AuthController {
 
       private final AuthService authService;
@@ -17,7 +16,12 @@ public class AuthController {
             this.authService = authService;
       }
 
-      @PostMapping("/login")
+      @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<String> handleRuntimeException(RuntimeException ex) {
+        return ResponseEntity.badRequest().body(ex.getMessage());
+    }
+
+    @PostMapping("/login")
       public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
             String token = authService.authenticate(request.getUsername(), request.getPassword());
             String role = authService.getUserRole(request.getUsername());

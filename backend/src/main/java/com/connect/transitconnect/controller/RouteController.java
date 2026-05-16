@@ -14,7 +14,6 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/routes")
-@CrossOrigin(origins = { "http://localhost:3000", "https://transitconnect-production.up.railway.app" })
 public class RouteController {
 
     private final RouteService routeService;
@@ -28,10 +27,13 @@ public class RouteController {
     // POST /api/routes/add
     // =========================================================================
     @PostMapping("/add")
-    public ResponseEntity<RouteEntity> addRoute(@RequestBody RouteInputDTO dto) {
-        RouteEntity saved = routeService.saveRoute(dto);
-        // FIX: 201 Created is more correct than 200 OK for a POST that creates a resource
-        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+    public ResponseEntity<?> addRoute(@RequestBody RouteInputDTO dto) {
+        try {
+            RouteEntity saved = routeService.saveRoute(dto);
+            return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 
     // =========================================================================

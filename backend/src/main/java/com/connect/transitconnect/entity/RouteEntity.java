@@ -19,10 +19,12 @@ public class RouteEntity {
     // Keep insertion order: stops[0] -> stops[1] -> ...
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "route_id")
+    @OrderColumn(name = "stop_order")
     private List<StopEntity> stops;
 
     // hops[i] corresponds to stops[i] -> stops[i+1]
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "route_id")
+    @OrderColumn(name = "hop_order")
     private List<HopEntity> hops;
 }

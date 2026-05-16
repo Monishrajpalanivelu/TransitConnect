@@ -44,6 +44,9 @@ public class AuthService {
             if (userRepository.findByUsername(request.getUsername()).isPresent()) {
                   throw new RuntimeException("Username already exists");
             }
+            if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+                  throw new RuntimeException("Email already exists");
+            }
             com.connect.transitconnect.entity.User user = new com.connect.transitconnect.entity.User();
             user.setUsername(request.getUsername());
             user.setPassword(passwordEncoder.encode(request.getPassword()));
