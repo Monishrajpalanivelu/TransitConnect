@@ -6,9 +6,24 @@ TransitConnect is a community-driven, full-stack web application designed to hel
 
 ##  🚀 Live Demo
 
-- **React App:** [https://transitfrontend.netlify.app](https://transitfrontend.netlify.app)
+*   **Frontend (React App):** [https://transitfrontend.netlify.app](https://transitfrontend.netlify.app)
+*   **Backend API Service:** [https://transitconnect.onrender.com](https://transitconnect.onrender.com)
+*   **Production API Health Check:** [https://transitconnect.onrender.com/actuator/health](https://transitconnect.onrender.com/actuator/health)
 
-*Note*: The backend is hosted on a free tier, so the first request may take a few seconds to "wake up" the server.
+*Note: The backend is hosted on a free tier, so the first request may take a few seconds to "wake up" the server.*
+
+---
+
+##  📐 Production Architecture
+
+```mermaid
+graph TD
+    User([User's Browser]) -->|HTTPS| Netlify[Netlify CDN: React Frontend]
+    Netlify -->|Secured API Calls + JWT| Render[Render: Spring Boot Backend]
+    Render -->|Internal Private Network| Postgres[(Render PostgreSQL Database)]
+    Render -->|Internal Private Network| Redis[(Render Valkey/Redis Cache)]
+    Render -->|Prometheus Metrics| Grafana[Grafana Dashboard]
+```
 
 ---
 
@@ -35,12 +50,13 @@ By mapping individual connections as reported by the community, TransitConnect c
 
 ### **Backend** 
 
-* **Java 17 & Spring Boot 3:** Robust core application framework with production-ready features.
+* **Java 21 & Spring Boot 3:** Robust core application framework with production-ready features.
 * **Spring Security:** Stateless authentication using **JWT (JSON Web Tokens)** with custom filter chain.
+* **Bucket4j:** Token Bucket-based **IP rate-limiting** interceptor to prevent DDoS and spam.
 * **Spring Data JPA:** For efficient ORM and data persistence with eager/lazy loading optimization.
-* **MySQL:** Relational database for storing complex transit nodes and relationships with indexed queries.
+* **PostgreSQL:** Production-grade relational database for robust storage of complex transit nodes.
 * **Spring Data Redis:** Caching layer for high-performance route optimization queries.
-* **Spring Cache:** @Cacheable and @CacheEvict for route results to reduce database load.
+* **Spring Cache:** `@Cacheable` and `@CacheEvict` for route results to reduce database load.
 
 ---
 
@@ -58,16 +74,11 @@ By mapping individual connections as reported by the community, TransitConnect c
 - **Result caching**: Spring Cache abstraction for shortest/fastest/cheapest path queries
 - **Redis integration**: Secondary caching for distributed deployments
 
-### **Search Algorithms**
-- **BFS (Breadth-First Search)**: Finds the shortest path by minimum number of hops
-- **Dijkstra's Algorithm**: Optimized for finding fastest (by duration) or cheapest (by cost) routes
-- **Strategy Pattern**: Pluggable cost functions for flexible route optimization
-
-### **Security**
+### **Security & Rate Limiting**
 - **JWT-based stateless authentication**: Reduces server state while maintaining user session integrity
+- **IP-based Rate Limiter**: Bucket4j interceptor limiting clients to **20 requests per minute per IP address** (returns `429 Too Many Requests` when exceeded)
 - **Dynamic CORS handling**: Configured to support secure communication across cloud environments and Netlify deploy previews
 - **SPA-optimized routing**: Custom configurations to handle browser refreshes and direct URL navigation without server-side errors
-- **Rate limiting**: Bucket4j integration for API rate limiting and DDoS protection
 
 ---
 
@@ -126,40 +137,46 @@ TransitConnect/
 ##  🚀 Local Setup
 
 ### **Prerequisites**
-- Java 17 or higher
-- MySQL 8.0+
+- Java 17 or higher (Temurin 21 recommended)
+- MySQL 8.0+ (Local native database)
 - Node.js 16+ and npm
+- Docker (optional, but highly recommended for starting Redis and Observability tools)
 
-### **1. Clone the Repository**
+### **1. Spin up Redis & Monitoring Services**
+To run caching and dashboards locally, spin up the Redis, Prometheus, and Grafana containers:
 ```bash
-git clone https://github.com/Monishrajpalanivelu/TransitConnect.git
-cd TransitConnect
+cd monitoring
+docker-compose up -d
 ```
 
 ### **2. Backend Setup**
 
 1. **Configure Database**
-   - Create a MySQL database (e.g., `transitconnect`)
-   - Update `backend/src/main/resources/application.properties`:
-     ```properties
-     spring.datasource.url=jdbc:mysql://localhost:3306/transitconnect
-     spring.datasource.username=root
-     spring.datasource.password=yourpassword
-     spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
-     spring.jpa.hibernate.ddl-auto=update
-     spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect
-     jwt.secret=your-secret-key-min-32-chars
-     spring.redis.host=localhost
-     spring.redis.port=6379
-     ```
+   - Create a MySQL database (e.g., `TransitConnect`)
+   - The backend runs dynamically with environment variables. You can configure them in your local `.env` or IDE configuration (they map to [application.properties](file:///c:/Users/P.Monishraj/Downloads/TansitConnect/backend/src/main/resources/application.properties)):
+     * `DB_URL` = `jdbc:mysql://localhost:3306/TransitConnect`
+     * `DB_USER` = `root`
+     * `DB_PASS` = `your_local_password`
+     * `REDIS_HOST` = `localhost`
+     * `REDIS_PORT` = `6379`
+     * `JWT_SECRET` = `TransitConnectSuperSecretKeyForJwtTokens1234567890`
 
-2. **Build & Run**
+2. **Run Automated Tests**
+   To execute the full integration test suite, including the new **Bucket4j Rate Limiting** checks (which run against your local database):
    ```bash
    cd backend
-   ./mvnw clean install
+   # Windows PowerShell
+   .\mvnw test -Dtest=RateLimitIntegrationTest
+   # Linux/Mac
+   ./mvnw test -Dtest=RateLimitIntegrationTest
+   ```
+
+3. **Build & Run Application**
+   ```bash
+   cd backend
    ./mvnw spring-boot:run
    ```
-   Backend runs on `http://localhost:8080`
+   Backend runs on `http://localhost:8081`
 
 ### **3. Frontend Setup**
 
