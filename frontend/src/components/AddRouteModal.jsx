@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { addRoute } from "../services/api";
-import { styles } from "../styles/styles";
 import MapPicker from "./MapPicker";
 
 export default function AddRouteModal({ onClose }) {
@@ -23,7 +22,6 @@ export default function AddRouteModal({ onClose }) {
     setHops(prev => prev.map((h, i) => (i === idx ? { ...h, [key]: val } : h)));
 
   const submit = async () => {
-    // Validation
     for (let s of stops) {
       if (!s.location || !s.location.trim()) return alert("Each stop must have a name");
       if (s.latitude == null || s.longitude == null)
@@ -38,7 +36,7 @@ export default function AddRouteModal({ onClose }) {
 
     try {
       await addRoute(payload);
-      alert("Route added");
+      alert("Route added successfully!");
       onClose();
     } catch (e) {
       alert("Add route failed: " + e.message);
@@ -46,76 +44,94 @@ export default function AddRouteModal({ onClose }) {
   };
 
   return (
-    <div style={styles.card}>
-      <h3>Add Route (with Map Picker)</h3>
-
-      {stops.map((s, i) => (
-        <div key={i} style={{ marginBottom: 20 }}>
-          <input
-            style={styles.input}
-            value={s.location}
-            placeholder={`Stop ${i + 1} name`}
-            onChange={(e) => updateStop(i, "location", e.target.value)}
-          />
-
-          {/* Map picker */}
-          <MapPicker
-            lat={s.latitude}
-            lng={s.longitude}
-            onChange={({ lat, lng }) => {
-              updateStop(i, "latitude", lat);
-              updateStop(i, "longitude", lng);
-            }}
-          />
-
-          {i < hops.length && (
-            <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                <span style={{ fontSize: 12, fontWeight: "bold" }}>Cost (₹)</span>
-                <input
-                  type="number"
-                  style={{ width: 100 }}
-                  min="0"
-                  value={hops[i].cost}
-                  placeholder="Cost"
-                  onChange={(e) => updateHop(i, "cost", e.target.value === "" ? "" : Number(e.target.value))}
-                />
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                <span style={{ fontSize: 12, fontWeight: "bold" }}>Duration (mins)</span>
-                <input
-                  type="number"
-                  style={{ width: 100 }}
-                  min="0"
-                  value={hops[i].duration}
-                  placeholder="Duration"
-                  onChange={(e) => updateHop(i, "duration", e.target.value === "" ? "" : Number(e.target.value))}
-                />
-              </div>
-
-              <select
-                value={hops[i].mode}
-                onChange={(e) => updateHop(i, "mode", e.target.value)}
-              >
-                <option>Bus</option>
-                <option>Metro</option>
-                <option>Walk</option>
-                <option>Auto</option>
-              </select>
-
-              <span style={{ fontSize: 13, color: "#555" }}>
-                (Hop from {s.location || `stop ${i + 1}`})
-              </span>
-            </div>
-          )}
+    <div className="modal-backdrop animate-fade-in" onClick={onClose}>
+      <div className="modal-content animate-slide-up" onClick={(e) => e.stopPropagation()}>
+        <div style={{ padding: "1.5rem", borderBottom: "1px solid var(--color-border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 className="heading-3" style={{ margin: 0 }}>Add a New Route</h3>
+          <button className="btn-ghost" onClick={onClose} style={{ fontSize: "1.25rem", padding: "0.25rem 0.5rem" }}>×</button>
         </div>
-      ))}
+        
+        <div style={{ padding: "1.5rem" }}>
+          <div className="alert-info" style={{ marginBottom: "1.5rem", fontSize: "0.875rem" }}>
+            Add stops in order, specify the transit mode, and drop pins on the map.
+          </div>
 
-      <div style={{ marginTop: 10 }}>
-        <button style={styles.blueBtn} onClick={addStop}>+ Add Stop</button>
-        <button style={{ ...styles.blueBtn, marginLeft: 12 }} onClick={submit}>Submit Route</button>
-        <button style={{ marginLeft: 8 }} onClick={onClose}>Cancel</button>
+          {stops.map((s, i) => (
+            <div key={i} style={{ marginBottom: "2rem", background: "var(--color-bg)", padding: "1rem", borderRadius: "var(--radius-md)" }}>
+              <label className="label">Stop {i + 1}</label>
+              <input
+                className="input-field"
+                style={{ marginBottom: "1rem" }}
+                value={s.location}
+                placeholder={`Name of Stop ${i + 1}`}
+                onChange={(e) => updateStop(i, "location", e.target.value)}
+              />
+
+              <div style={{ borderRadius: "var(--radius-sm)", overflow: "hidden", border: "1px solid var(--color-border)", height: "200px" }}>
+                <MapPicker
+                  lat={s.latitude}
+                  lng={s.longitude}
+                  onChange={({ lat, lng }) => {
+                    updateStop(i, "latitude", lat);
+                    updateStop(i, "longitude", lng);
+                  }}
+                />
+              </div>
+
+              {i < hops.length && (
+                <div style={{ marginTop: "1rem", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem" }}>
+                  <div>
+                    <label className="label" style={{ fontSize: "0.75rem" }}>Cost (₹)</label>
+                    <input
+                      className="input-field"
+                      type="number"
+                      min="0"
+                      value={hops[i].cost}
+                      placeholder="e.g. 20"
+                      onChange={(e) => updateHop(i, "cost", e.target.value === "" ? "" : Number(e.target.value))}
+                    />
+                  </div>
+                  <div>
+                    <label className="label" style={{ fontSize: "0.75rem" }}>Duration (m)</label>
+                    <input
+                      className="input-field"
+                      type="number"
+                      min="0"
+                      value={hops[i].duration}
+                      placeholder="e.g. 15"
+                      onChange={(e) => updateHop(i, "duration", e.target.value === "" ? "" : Number(e.target.value))}
+                    />
+                  </div>
+                  <div>
+                    <label className="label" style={{ fontSize: "0.75rem" }}>Mode</label>
+                    <select
+                      className="input-field"
+                      value={hops[i].mode}
+                      onChange={(e) => updateHop(i, "mode", e.target.value)}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <option>Bus</option>
+                      <option>Metro</option>
+                      <option>Walk</option>
+                      <option>Auto</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: "2rem" }}>
+            <button className="btn-secondary" onClick={addStop}>
+              + Add Another Stop
+            </button>
+          </div>
+        </div>
+
+        <div style={{ padding: "1.25rem 1.5rem", borderTop: "1px solid var(--color-border)", display: "flex", justifyContent: "flex-end", gap: "1rem", background: "var(--color-bg)", borderBottomLeftRadius: "var(--radius-xl)", borderBottomRightRadius: "var(--radius-xl)" }}>
+          <button className="btn-secondary" onClick={onClose}>Cancel</button>
+          <button className="btn-primary" onClick={submit}>Submit Route</button>
+        </div>
       </div>
     </div>
   );
