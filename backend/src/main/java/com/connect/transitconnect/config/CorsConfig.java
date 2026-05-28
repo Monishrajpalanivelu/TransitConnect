@@ -31,3 +31,4 @@ public class CorsConfig implements WebMvcConfigurer {
         registry.addInterceptor(rateLimitInterceptor)
                 .addPathPatterns("/api/**"); 
 }
+}
