@@ -105,13 +105,16 @@ public class RouteController {
         return ResponseEntity.ok(result);
     }
 
+    @org.springframework.beans.factory.annotation.Value("${app.admin.delete-password}")
+    private String adminDeletePassword;
+
     // =========================================================================
     // DELETE ROUTE
     // DELETE /api/routes/{id}
     // =========================================================================
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id, @RequestParam(value = "password", required = false) String password) {
-        if (!"admindelete!".equals(password)) {
+        if (!adminDeletePassword.equals(password)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", "wrong pass"));
         }
         routeService.deleteRoute(id);
