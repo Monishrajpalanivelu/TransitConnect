@@ -209,12 +209,6 @@ Contributions are welcome! Please:
 
 ---
 
-##  📝 License
-
-This project is open source and available under the MIT License.
-
----
-
 ##  ✨ Features in Development
 
 - Real-time route updates from user contributions
@@ -222,4 +216,5 @@ This project is open source and available under the MIT License.
 - User ratings and reviews for routes
 - Mobile app version (React Native)
 - Integration with public transit APIs
+- proper google sign in
 
