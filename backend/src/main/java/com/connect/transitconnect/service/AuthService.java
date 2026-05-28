@@ -46,6 +46,11 @@ public class AuthService {
                         org.springframework.http.HttpStatus.BAD_REQUEST, "Username already exists"
                   );
             }
+            if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+                  throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST, "Email already exists"
+                  );
+            }
             com.connect.transitconnect.entity.User user = new com.connect.transitconnect.entity.User();
             user.setUsername(request.getUsername());
             user.setPassword(passwordEncoder.encode(request.getPassword()));
