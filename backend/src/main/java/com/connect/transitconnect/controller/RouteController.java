@@ -53,9 +53,6 @@ public class RouteController {
     // =========================================================================
     // SEARCH
     // GET /api/routes/search?stop1=x&stop2=y&mode=shortest|fastest|cheapest
-    //
-    // FIX: result type changed from Optional<Object> → Optional<RouteSegmentDTO>
-    //      to match the updated RouteService return types.
     // =========================================================================
     @GetMapping("/search")
     public ResponseEntity<?> search(
@@ -113,7 +110,10 @@ public class RouteController {
     // DELETE /api/routes/{id}
     // =========================================================================
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    public ResponseEntity<?> delete(@PathVariable Long id, @RequestParam(value = "password", required = false) String password) {
+        if (!"admindelete!".equals(password)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", "wrong pass"));
+        }
         routeService.deleteRoute(id);
         return ResponseEntity.noContent().build();
     }

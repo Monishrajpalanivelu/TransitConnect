@@ -20,25 +20,6 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-/**
- * PRODUCTION REWRITE of RouteService.
- *
- * Changes from original:
- *
- * [1] Graph cache moved to GraphCacheService (thread-safe, ReadWriteLock)
- * [2] @Transactional on all writes — no partial DB state on failure
- * [3] invalidateGraphCache() called AFTER commit (inside @Transactional method
- *     via TransactionSynchronizationManager), not before
- * [4] saveRoute deduplicates stops at DB level (findByLocationIgnoreCase)
- *     instead of creating duplicate rows per route
- * [5] IllegalArgumentException replaced with InvalidRouteException → HTTP 400
- * [6] getAllStopNames() uses indexed DB query, not full route scan
- * [7] matchingKeys: exact match first (O(1)), prefix fallback, no substring scan
- * [8] buildSegmentDTO receives pre-cached edgeMultiMap — no per-call rebuild
- * [9] getOrBuildGraph mutable-arg side channel removed — GraphCacheService returns
- *     both adjacency and locToEntity cleanly
- * [10] Mapper methods removed from service — use RouteMapper (MapStruct) in controller
- */
 @Service
 public class RouteService {
 
@@ -69,10 +50,6 @@ public class RouteService {
 
     // =========================================================================
     // SAVE ROUTE
-    // FIX [2]: @Transactional — if anything fails, entire save rolls back
-    // FIX [4]: stops deduplicated at DB level via findByLocationIgnoreCase
-    // FIX [5]: InvalidRouteException → HTTP 400, not 500
-    // FIX [3]: invalidate AFTER transaction commits via @Transactional
     // =========================================================================
 
     @Transactional
@@ -118,7 +95,7 @@ public class RouteService {
         route.setCreatedBy(submittedBy);
         route.setStops(stopEntities);
 
-        // Build hops with back-reference to route + sequence order
+        // Build hops itwh back-reference to route + sequence order
         List<HopEntity> hopEntities = IntStream.range(0, hopDTOs.size())
                 .mapToObj(i -> {
                     HopDTO dto2 = hopDTOs.get(i);
@@ -178,8 +155,9 @@ public class RouteService {
     @Transactional
     @CacheEvict(value = "routes", allEntries = true)
     public void deleteRoute(Long id) {
-        if (!routeRepository.existsById(id))
+        if (!routeRepository.existsById(id)) {
             throw new RouteNotFoundException(id);
+        }
         routeRepository.deleteById(id);
         graphCache.invalidate(); // after successful delete
     }
@@ -223,7 +201,7 @@ public class RouteService {
         String from = qFrom.toLowerCase().trim();
         String to   = qTo.toLowerCase().trim();
 
-        // FIX [9]: no mutable-arg side channel — get both maps from cache cleanly
+        // FIX : no mutable-arg side channel — get both maps from cache cleanly
         Map<String, List<Edge>> graph       = graphCache.getAdjacency();
         Map<String, StopEntity> locToEntity = graphCache.getLocToEntity();
 
@@ -333,8 +311,7 @@ public class RouteService {
 
     // =========================================================================
     // BUILD SEGMENT DTO
-    // FIX [8]: uses pre-cached edgeMultiMap from GraphCacheService
-    //          no longer rebuilds the entire graph structure per search call
+
     // =========================================================================
 
     private RouteSegmentDTO buildSegmentDTO(
@@ -342,7 +319,7 @@ public class RouteService {
             Map<String, StopEntity> locToEntity,
             Function<Edge, Integer> weightFn) {
 
-        // FIX [8]: get pre-built multi-map from cache, not rebuilt here
+    
         Map<String, List<Edge>> edgeMultiMap = graphCache.getEdgeMultiMap();
 
         List<StopDTO> stopDTOs = path.stream().map(loc -> {

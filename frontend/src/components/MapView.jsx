@@ -1,8 +1,10 @@
 // React 19 + React-Leaflet 5 compatible MapView
 
 import { useState, useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Polyline, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
+import { GeoSearchControl, OpenStreetMapProvider } from "leaflet-geosearch";
+import "leaflet-geosearch/dist/geosearch.css";
 
 import iconUrl from "leaflet/dist/images/marker-icon.png";
 import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
@@ -13,6 +15,32 @@ L.Icon.Default.mergeOptions({
   iconRetinaUrl,
   shadowUrl,
 });
+
+function SearchControl() {
+  const map = useMap();
+
+  useEffect(() => {
+    const provider = new OpenStreetMapProvider();
+    const searchControl = new GeoSearchControl({
+      provider: provider,
+      style: "bar",
+      showMarker: true, 
+      retainZoomLevel: false,
+      animateZoom: true,
+      autoClose: true,
+      searchLabel: "Search places...",
+      keepResult: true,
+    });
+
+    map.addControl(searchControl);
+
+    return () => {
+      map.removeControl(searchControl);
+    };
+  }, [map]);
+
+  return null;
+}
 
 export default function MapView({ stops = [], hops = [] }) {
   const [routeGeometry, setRouteGeometry] = useState([]);
@@ -61,6 +89,8 @@ export default function MapView({ stops = [], hops = [] }) {
           attribution='© OpenStreetMap contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        
+        <SearchControl />
 
         {/* Markers */}
         {stops.map((stop, idx) => (

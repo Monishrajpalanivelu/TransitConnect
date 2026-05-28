@@ -15,6 +15,15 @@ export default function AddRouteModal({ onClose }) {
     setHops(prev => [...prev, { cost: "", duration: "", mode: "Bus" }]);
   };
 
+  const removeStop = (idx) => {
+    if (stops.length <= 2) {
+      alert("A route must have at least 2 stops.");
+      return;
+    }
+    setStops(prev => prev.filter((_, i) => i !== idx));
+    setHops(prev => prev.filter((_, i) => i !== Math.min(idx, prev.length - 1)));
+  };
+
   const updateStop = (idx, key, val) =>
     setStops(prev => prev.map((s, i) => (i === idx ? { ...s, [key]: val } : s)));
 
@@ -58,7 +67,18 @@ export default function AddRouteModal({ onClose }) {
 
           {stops.map((s, i) => (
             <div key={i} style={{ marginBottom: "2rem", background: "var(--color-bg)", padding: "1rem", borderRadius: "var(--radius-md)" }}>
-              <label className="label">Stop {i + 1}</label>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                <label className="label" style={{ margin: 0 }}>Stop {i + 1}</label>
+                {stops.length > 2 && (
+                  <button 
+                    className="btn-ghost" 
+                    onClick={() => removeStop(i)} 
+                    style={{ color: "#DC2626", fontSize: "0.8rem", padding: "0.25rem 0.5rem", fontWeight: 600 }}
+                  >
+                    Remove Stop
+                  </button>
+                )}
+              </div>
               <input
                 className="input-field"
                 style={{ marginBottom: "1rem" }}

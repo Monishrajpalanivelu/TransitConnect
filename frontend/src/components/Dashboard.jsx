@@ -3,6 +3,7 @@ import SearchBar from "./SearchBox";
 import RouteCard from "./RouteCard";
 import TopNav from "./TopNav";
 import AddRouteModal from "./AddRouteModal";
+import ManageRoutes from "./ManageRoutes";
 import { searchRoutes } from "../services/api";
 import { logout } from "../services/auth";
 import { useNavigate } from "react-router-dom";
@@ -11,6 +12,7 @@ import Welcome from "./Welcome";
 export default function Dashboard() {
       const [result, setResult] = useState(null);
       const [showAdd, setShowAdd] = useState(false);
+      const [showManage, setShowManage] = useState(false);
       const [error, setError] = useState("");
       const navigate = useNavigate();
 
@@ -41,21 +43,23 @@ export default function Dashboard() {
                         <button className="btn-danger" onClick={handleLogout} style={{ borderRadius: "9999px" }}>Logout</button>
                   </div>
 
-                  {!showAdd && !result && <Welcome />}
-                  {!showAdd && <SearchBar onSearch={handleSearch} />}
+                  {!showAdd && !showManage && !result && <Welcome />}
+                  {!showAdd && !showManage && <SearchBar onSearch={handleSearch} />}
                   
-                  {!showAdd && error && (
+                  {!showAdd && !showManage && error && (
                         <div className="glass-card animate-slide-up" style={{ color: "var(--color-error)", borderLeft: "4px solid var(--color-error)" }}>
                               {error}
                         </div>
                   )}
 
-                  {!showAdd && result && <RouteCard data={result} />}
+                  {!showAdd && !showManage && result && <RouteCard data={result} />}
                   {showAdd && <AddRouteModal onClose={() => setShowAdd(false)} />}
+                  {showManage && <ManageRoutes />}
 
                   <TopNav
-                        onHome={() => { setShowAdd(false); setResult(null); setError(""); }}
-                        onAdd={() => setShowAdd(true)}
+                        onHome={() => { setShowAdd(false); setShowManage(false); setResult(null); setError(""); }}
+                        onAdd={() => { setShowAdd(true); setShowManage(false); }}
+                        onManage={() => { setShowManage(true); setShowAdd(false); }}
                   />
             </div>
       );

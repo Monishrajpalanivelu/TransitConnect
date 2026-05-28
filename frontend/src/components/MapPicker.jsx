@@ -1,8 +1,10 @@
 // React 19 + React-Leaflet 5 compatible MapPicker
 
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
-import { useState } from "react";
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
+import { useState, useEffect } from "react";
 import L from "leaflet";
+import { GeoSearchControl, OpenStreetMapProvider } from "leaflet-geosearch";
+import "leaflet-geosearch/dist/geosearch.css";
 
 import iconUrl from "leaflet/dist/images/marker-icon.png";
 import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
@@ -13,6 +15,41 @@ L.Icon.Default.mergeOptions({
   iconRetinaUrl,
   shadowUrl,
 });
+
+function SearchControl({ onSelect }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const provider = new OpenStreetMapProvider();
+    const searchControl = new GeoSearchControl({
+      provider: provider,
+      style: "bar",
+      showMarker: false, 
+      retainZoomLevel: false,
+      animateZoom: true,
+      autoClose: true,
+      searchLabel: "Search places...",
+      keepResult: true,
+    });
+
+    map.addControl(searchControl);
+
+    const handleLocationFound = (e) => {
+      if (onSelect) {
+        onSelect([e.location.y, e.location.x]);
+      }
+    };
+
+    map.on('geosearch/showlocation', handleLocationFound);
+
+    return () => {
+      map.removeControl(searchControl);
+      map.off('geosearch/showlocation', handleLocationFound);
+    };
+  }, [map, onSelect]);
+
+  return null;
+}
 
 // Handles map click to select a location
 function ClickHandler({ onSelect }) {
@@ -46,6 +83,7 @@ export default function MapPicker({ lat, lng, onChange }) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
+        <SearchControl onSelect={handleSelect} />
         <ClickHandler onSelect={handleSelect} />
 
         <Marker position={position} />

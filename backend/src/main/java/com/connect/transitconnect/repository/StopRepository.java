@@ -12,8 +12,8 @@ public interface StopRepository extends JpaRepository<StopEntity, Long> {
     // Exact match — used in saveRoute to find existing stop before creating new
     Optional<StopEntity> findByLocationIgnoreCase(String location);
 
-    // All distinct stop names — replaces routeRepository.findAll() flatMap distinct
-    @Query("SELECT LOWER(s.location) FROM StopEntity s ORDER BY s.location")
+    // All distinct stop names that are currently used in at least one route
+    @Query("SELECT DISTINCT LOWER(s.location) FROM RouteEntity r JOIN r.stops s ORDER BY LOWER(s.location)")
     List<String> findAllDistinctLocations();
 
     // Prefix search for frontend autocomplete dropdown

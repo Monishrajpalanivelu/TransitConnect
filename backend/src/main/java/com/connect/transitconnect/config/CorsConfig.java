@@ -17,7 +17,7 @@ public class CorsConfig implements WebMvcConfigurer {
         registry.addMapping("/**")
                 .allowedOriginPatterns(
                         "http://localhost:3000",
-                        "https://*.netlify.app", // Covers all Netlify previews
+                        "https://*.netlify.app", 
                         "https://transitfrontend.netlify.app",
                         "https://transitconnect-production.up.railway.app"
                 )
@@ -29,6 +29,5 @@ public class CorsConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(rateLimitInterceptor)
-                .addPathPatterns("/api/**"); // Apply rate limiting to all API endpoints
-    }
+                .addPathPatterns("/api/**"); 
 }

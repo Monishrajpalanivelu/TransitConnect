@@ -70,6 +70,17 @@ export async function getAllRoutes() {
   return handleResponse(res);
 }
 
+/* DELETE ROUTE */
+export async function deleteRoute(id, password) {
+  const res = await fetch(`${BASE}/${id}?password=${encodeURIComponent(password)}`, {
+    method: "DELETE",
+    headers: getAuthHeaders()
+  });
+  
+  if (res.status === 204) return true;
+  return handleResponse(res);
+}
+
 /* ⭐ GET ALL STOP NAMES */
 export async function fetchStops() {
   const res = await fetch(`${BASE}/stops`, {
