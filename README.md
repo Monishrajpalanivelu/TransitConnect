@@ -189,15 +189,6 @@ Frontend runs on `http://localhost:3000`
 
 ---
 
-##  📊 Language Composition
-
-- **Java**: 62.6% (Spring Boot backend, algorithms, data models)
-- **JavaScript**: 34.8% (React frontend, UI components)
-- **HTML**: 1.7% (Static markup)
-- **CSS**: 0.9% (Styling via Tailwind)
-
----
-
 ##  🤝 Contributing
 
 Contributions are welcome! Please:
