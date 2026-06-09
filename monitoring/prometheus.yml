@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 5s # How often to scrape targets (every 5 seconds)
+
+scrape_configs:
+  - job_name: 'transitconnect-backend'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      # host.docker.internal allows the Docker container to access your local machine's localhost
+      - targets: ['host.docker.internal:8081']
