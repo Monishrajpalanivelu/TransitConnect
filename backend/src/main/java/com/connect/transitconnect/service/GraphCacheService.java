@@ -20,12 +20,26 @@ public class GraphCacheService {
     // ---- Inner Edge type (package-visible for RouteService) -----------------
     static class Edge {
         final String to;
-        final int cost, duration;
+        final int cost, duration, distance;
         final String mode;
-        Edge(String to, int cost, int duration, String mode) {
+        Edge(String to, int cost, int duration, String mode, int distance) {
             this.to = to; this.cost = cost;
             this.duration = duration; this.mode = mode;
+            this.distance = distance;
         }
+    }
+
+    private int calculateDistance(Double lat1, Double lon1, Double lat2, Double lon2) {
+        if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return 1;
+        final int R = 6371; // Radius of the earth in km
+        double latDistance = Math.toRadians(lat2 - lat1);
+        double lonDistance = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        double distance = R * c * 1000; // convert to meters
+        return (int) Math.max(1, distance); // at least 1 meter to avoid 0 weight edges
     }
 
     // ---- Immutable snapshot built once per cache miss -----------------------
@@ -99,8 +113,10 @@ public class GraphCacheService {
             adjacency.putIfAbsent(u, new ArrayList<>());
             adjacency.putIfAbsent(v, new ArrayList<>());
 
-            Edge fwd = new Edge(v, hop.getCost(), hop.getDuration(), hop.getMode());
-            Edge bwd = new Edge(u, hop.getCost(), hop.getDuration(), hop.getMode());
+            int dist = calculateDistance(from.getLatitude(), from.getLongitude(), to.getLatitude(), to.getLongitude());
+
+            Edge fwd = new Edge(v, hop.getCost(), hop.getDuration(), hop.getMode(), dist);
+            Edge bwd = new Edge(u, hop.getCost(), hop.getDuration(), hop.getMode(), dist);
 
             adjacency.get(u).add(fwd);
             adjacency.get(v).add(bwd);

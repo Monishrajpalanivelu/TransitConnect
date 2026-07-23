@@ -152,7 +152,7 @@ public class RouteService {
                 .collect(Collectors.toList());
 
         List<HopDTO> hopDTOs = entity.getHops().stream()
-                .map(h -> new HopDTO(h.getCost(), h.getDuration(), h.getMode()))
+                .map(h -> new HopDTO(h.getCost(), h.getDuration(), null, h.getMode()))
                 .collect(Collectors.toList());
 
         return new RouteResponseDTO(
@@ -195,7 +195,7 @@ public class RouteService {
 
     @Cacheable(value = "routes", key = "'shortest_' + #from + '_' + #to", unless = "#result == null")
     public RouteSegmentDTO findShortestPath(String from, String to) {
-        return bfsSearch(from, to).orElse(null);
+        return dijkstra(from, to, e -> e.distance).orElse(null);
     }
 
     @Cacheable(value = "routes", key = "'fastest_' + #from + '_' + #to", unless = "#result == null")
@@ -208,46 +208,7 @@ public class RouteService {
         return dijkstra(from, to, e -> e.cost).orElse(null);
     }
 
-    // =========================================================================
-    // BFS — minimum hops
-    // =========================================================================
 
-    private Optional<RouteSegmentDTO> bfsSearch(String qFrom, String qTo) {
-        if (qFrom == null || qTo == null) return Optional.empty();
-
-        String from = qFrom.toLowerCase().trim();
-        String to   = qTo.toLowerCase().trim();
-
-        // FIX [9]: no mutable-arg side channel — get both maps from cache cleanly
-        Map<String, List<Edge>> graph       = graphCache.getAdjacency();
-        Map<String, StopEntity> locToEntity = graphCache.getLocToEntity();
-
-        Set<String> starts = matchingKeys(graph, from);
-        Set<String> ends   = matchingKeys(graph, to);
-        if (starts.isEmpty() || ends.isEmpty()) return Optional.empty();
-
-        Queue<String>       queue   = new ArrayDeque<>(starts);
-        Set<String>         visited = new HashSet<>(starts);
-        Map<String, String> parent  = new HashMap<>();
-        starts.forEach(s -> parent.put(s, null));
-
-        String found = null;
-        while (!queue.isEmpty()) {
-            String curr = queue.poll();
-            if (ends.contains(curr)) { found = curr; break; }
-            for (Edge e : graph.getOrDefault(curr, List.of())) {
-                if (!visited.contains(e.to)) {
-                    visited.add(e.to);
-                    parent.put(e.to, curr);
-                    queue.add(e.to);
-                }
-            }
-        }
-
-        if (found == null) return Optional.empty();
-        return Optional.of(buildSegmentDTO(
-                reconstructPath(found, parent), locToEntity, null));
-    }
 
     // =========================================================================
     // DIJKSTRA — generic weight function (Strategy Pattern)
@@ -272,7 +233,7 @@ public class RouteService {
         PriorityQueue<Node>  pq      = new PriorityQueue<>(Comparator.comparingInt(n -> n.weight));
         Map<String, Integer> dist    = new HashMap<>();
         Map<String, String>  parent  = new HashMap<>();
-        Set<String>          visited = new HashSet<>();
+        Set<String> visited = new HashSet<>();
 
         for (String s : starts) {
             dist.put(s, 0);
@@ -326,18 +287,13 @@ public class RouteService {
         return path;
     }
 
-    // =========================================================================
-    // BUILD SEGMENT DTO
-    // FIX [8]: uses pre-cached edgeMultiMap from GraphCacheService
-    //          no longer rebuilds the entire graph structure per search call
-    // =========================================================================
 
     private RouteSegmentDTO buildSegmentDTO(
             List<String> path,
             Map<String, StopEntity> locToEntity,
             Function<Edge, Integer> weightFn) {
 
-        // FIX [8]: get pre-built multi-map from cache, not rebuilt here
+
         Map<String, List<Edge>> edgeMultiMap = graphCache.getEdgeMultiMap();
 
         List<StopDTO> stopDTOs = path.stream().map(loc -> {
@@ -356,6 +312,7 @@ public class RouteService {
         List<HopDTO> hopDTOs  = new ArrayList<>();
         int totalCost         = 0;
         int totalDuration     = 0;
+        int totalDistance     = 0;
 
         for (int i = 0; i < path.size() - 1; i++) {
             String key           = path.get(i) + "->" + path.get(i + 1);
@@ -374,15 +331,18 @@ public class RouteService {
 
             int c = chosen != null ? chosen.cost     : 0;
             int d = chosen != null ? chosen.duration : 0;
+            int dist = chosen != null ? chosen.distance : 0;
 
             HopDTO hd = new HopDTO();
             hd.setCost(c);
             hd.setDuration(d);
+            hd.setDistance(dist);
             hd.setMode(chosen != null ? chosen.mode : null);
             hopDTOs.add(hd);
 
             totalCost     += c;
             totalDuration += d;
+            totalDistance += dist;
         }
 
         RouteSegmentDTO seg = new RouteSegmentDTO();
@@ -390,6 +350,7 @@ public class RouteService {
         seg.setSegmentHops(hopDTOs);
         seg.setTotalCost(totalCost);
         seg.setTotalDuration(totalDuration);
+        seg.setTotalDistance(totalDistance);
         seg.setStopsCount(stopDTOs.size());
         return seg;
     }

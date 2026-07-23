@@ -12,5 +12,6 @@ public class RouteSegmentDTO {
     private List<HopDTO> segmentHops;
     private Integer totalCost;
     private Integer totalDuration;
+    private Integer totalDistance;
     private Integer stopsCount;
 }

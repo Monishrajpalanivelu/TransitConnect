@@ -13,5 +13,7 @@ public class HopDTO {
     @Min(value = 0, message = "Duration must be >= 0")
     private Integer duration;
 
+    private Integer distance;
+
     private String mode;
 }
