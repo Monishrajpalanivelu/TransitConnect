@@ -153,13 +153,13 @@ docker-compose up -d
 
 1. **Configure Database**
    - Create a MySQL database (e.g., `TransitConnect`)
-   - The backend runs dynamically with environment variables. You can configure them in your local `.env` or IDE configuration (they map to [application.properties](file:///c:/Users/P.Monishraj/Downloads/TansitConnect/backend/src/main/resources/application.properties)):
+   - The backend runs dynamically with environment variables. You can configure them in your local `.env` or IDE configuration (they map to `backend/src/main/resources/application.properties`):
      * `DB_URL` = `jdbc:mysql://localhost:3306/TransitConnect`
      * `DB_USER` = `root`
      * `DB_PASS` = `your_local_password`
      * `REDIS_HOST` = `localhost`
      * `REDIS_PORT` = `6379`
-     * `JWT_SECRET` = `TransitConnectSuperSecretKeyForJwtTokens1234567890`
+     * `JWT_SECRET` = `<your-secret-key>` (generate a secure random string, min 256-bit)
 
 2. **Run Automated Tests**
    To execute the full integration test suite, including the new **Bucket4j Rate Limiting** checks (which run against your local database):
