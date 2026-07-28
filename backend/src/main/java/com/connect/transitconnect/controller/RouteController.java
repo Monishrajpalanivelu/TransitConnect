@@ -5,6 +5,8 @@ import com.connect.transitconnect.dto.RouteSegmentDTO;
 import com.connect.transitconnect.entity.RouteEntity;
 import com.connect.transitconnect.service.RouteService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -12,9 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+
 import com.connect.transitconnect.dto.RouteResponseDTO;
 
 @RestController
@@ -28,13 +28,13 @@ public class RouteController {
     }
 
     // =========================================================================
-    // ADD ROUTE
-    // POST /api/routes/add
+    // ADD ROUTE  —  POST /api/routes/add
     // =========================================================================
     @PostMapping("/add")
-    public ResponseEntity<Map<String, Object>> addRoute(@Valid @RequestBody RouteInputDTO dto,
-                                                Authentication auth) {
-        RouteEntity saved = routeService.saveRoute(dto,auth.getName());
+    public ResponseEntity<Map<String, Object>> addRoute(
+            @Valid @RequestBody RouteInputDTO dto,
+            Authentication auth) {
+        RouteEntity saved = routeService.saveRoute(dto, auth.getName());
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "message", "Route created successfully",
                 "routeId", saved.getId()
@@ -42,8 +42,28 @@ public class RouteController {
     }
 
     // =========================================================================
-    // GET ALL ROUTES
-    // GET /api/routes/all
+    // UPDATE ROUTE  —  PUT /api/routes/{id}
+    // Only the original creator can update their own route.
+    // =========================================================================
+    @PutMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> updateRoute(
+            @PathVariable Long id,
+            @Valid @RequestBody RouteInputDTO dto,
+            Authentication auth) {
+        try {
+            RouteEntity updated = routeService.updateRoute(id, dto, auth.getName());
+            return ResponseEntity.ok(Map.of(
+                    "message", "Route updated successfully",
+                    "routeId", updated.getId()
+            ));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    // =========================================================================
+    // GET ALL ROUTES  —  GET /api/routes/all
     // =========================================================================
     @GetMapping("/all")
     public ResponseEntity<Page<RouteResponseDTO>> getAll(Pageable pageable) {
@@ -51,79 +71,72 @@ public class RouteController {
     }
 
     // =========================================================================
-    // SEARCH
-    // GET /api/routes/search?stop1=x&stop2=y&mode=shortest|fastest|cheapest
-    //
-    // FIX: result type changed from Optional<Object> → Optional<RouteSegmentDTO>
-    //      to match the updated RouteService return types.
+    // SEARCH  —  GET /api/routes/search?stop1=x&stop2=y
     // =========================================================================
     @GetMapping("/search")
     public ResponseEntity<?> search(
             @RequestParam("stop1") String stop1,
-            @RequestParam("stop2") String stop2,
-            @RequestParam(value = "mode", required = false, defaultValue = "shortest") String mode) {
+            @RequestParam("stop2") String stop2) {
 
-        // Validation
         if (stop1.trim().isEmpty() || stop2.trim().isEmpty()) {
-            return ResponseEntity
-                    .badRequest()
+            return ResponseEntity.badRequest()
                     .body(Map.of("message", "stop1 and stop2 must not be blank"));
         }
 
         if (stop1.trim().equalsIgnoreCase(stop2.trim())) {
-            return ResponseEntity
-                    .badRequest()
+            return ResponseEntity.badRequest()
                     .body(Map.of("message", "Source and destination stops cannot be the same"));
         }
 
-        // FIX: type is now RouteSegmentDTO directly (to avoid Redis JSON Optional serialization bugs)
-        RouteSegmentDTO result = null;
-        switch (mode.toLowerCase().trim()) {
-            case "fastest":
-                result = routeService.findFastestPath(stop1, stop2);
-                break;
-            case "cheapest":
-            case "mincost":
-            case "minimum-cost":
-                result = routeService.findMinCostPath(stop1, stop2);
-                break;
-            case "shortest":
-                result = routeService.findShortestPath(stop1, stop2);
-                break;
-            default:
-                return ResponseEntity
-                    .badRequest()
-                    .body(Map.of(
-                            "message", "Invalid mode. Allowed values: shortest (default), fastest, cheapest"));
-        }
+        Map<String, RouteSegmentDTO> results = new java.util.HashMap<>();
 
-        // FIX: return 404 with a clear message if no route was found (result is null)
-        if (result == null) {
-            return ResponseEntity
-                    .status(HttpStatus.NOT_FOUND)
+        RouteSegmentDTO shortest = routeService.findShortestPath(stop1, stop2);
+        if (shortest != null) results.put("shortest", shortest);
+
+        RouteSegmentDTO fastest = routeService.findFastestPath(stop1, stop2);
+        if (fastest != null) results.put("fastest", fastest);
+
+        RouteSegmentDTO cheapest = routeService.findMinCostPath(stop1, stop2);
+        if (cheapest != null) results.put("cheapest", cheapest);
+
+        if (results.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("message",
                             "No route found between '" + stop1 + "' and '" + stop2 + "'"));
         }
 
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(results);
     }
 
     // =========================================================================
-    // DELETE ROUTE
-    // DELETE /api/routes/{id}
+    // DELETE ROUTE  —  DELETE /api/routes/{id}
+    // Only the original creator can delete their own route.
     // =========================================================================
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        routeService.deleteRoute(id);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<?> delete(@PathVariable Long id, Authentication auth) {
+        try {
+            routeService.deleteRoute(id, auth.getName());
+            return ResponseEntity.noContent().build();
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", e.getMessage()));
+        }
     }
 
     // =========================================================================
-    // GET ALL STOP NAMES
-    // GET /api/routes/stops
+    // STOP AUTOCOMPLETE  —  GET /api/routes/stops?q=ben&limit=10
+    // Returns up to `limit` stop names matching the prefix.
+    // Falls back to all stops if q is blank (for initial dropdown population).
     // =========================================================================
     @GetMapping("/stops")
-    public ResponseEntity<List<String>> getAllStops() {
-        return ResponseEntity.ok(routeService.getAllStopNames());
+    public ResponseEntity<List<String>> getStops(
+            @RequestParam(value = "q", required = false, defaultValue = "") String q,
+            @RequestParam(value = "limit", required = false, defaultValue = "10") int limit) {
+
+        List<String> results = q.isBlank()
+                ? routeService.getAllStopNames()
+                : routeService.searchStopNames(q, limit);
+
+        return ResponseEntity.ok(results);
     }
 }

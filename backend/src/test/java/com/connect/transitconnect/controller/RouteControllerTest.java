@@ -65,7 +65,7 @@ class RouteControllerTest {
                 new StopDTO("Stop A", 12.97, 77.59),
                 new StopDTO("Stop B", 12.93, 77.62)
         ));
-        dto.setHops(List.of(new HopDTO(10, 20, "Bus")));
+        dto.setHops(List.of(new HopDTO(10, 20, 100, "Bus", false)));
 
         mockMvc.perform(post("/api/routes/add")
                         .with(csrf())
@@ -76,10 +76,7 @@ class RouteControllerTest {
                 .andExpect(jsonPath("$.routeId").value(42));
     }
 
-    // -------------------------------------------------------------------------
-    // GET /api/routes/search — validation
-    // -------------------------------------------------------------------------
-
+    
     @Test
     @WithMockUser
     void search_returns400_whenStop1AndStop2AreTheSame() throws Exception {
@@ -116,26 +113,23 @@ class RouteControllerTest {
                 .andExpect(jsonPath("$.message").value("No route found between 'A' and 'Z'"));
     }
 
-    // -------------------------------------------------------------------------
-    // DELETE /api/routes/{id}
-    // -------------------------------------------------------------------------
-
+    
     @Test
     @WithMockUser(roles = "ADMIN")
     void delete_returns204_whenRouteExistsAndIsDeleted() throws Exception {
-        doNothing().when(routeService).deleteRoute(1L);
+        doNothing().when(routeService).deleteRoute(eq(1L), anyString());
 
         mockMvc.perform(delete("/api/routes/1").with(csrf()))
                 .andExpect(status().isNoContent());
 
-        verify(routeService, times(1)).deleteRoute(1L);
+        verify(routeService, times(1)).deleteRoute(eq(1L), anyString());
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void delete_returns404_whenRouteDoesNotExist() throws Exception {
         doThrow(new RouteNotFoundException(999L))
-                .when(routeService).deleteRoute(999L);
+                .when(routeService).deleteRoute(eq(999L), anyString());
 
         mockMvc.perform(delete("/api/routes/999").with(csrf()))
                 .andExpect(status().isNotFound());

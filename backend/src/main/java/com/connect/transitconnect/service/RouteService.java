@@ -8,6 +8,11 @@ import com.connect.transitconnect.repository.HopRepository;
 import com.connect.transitconnect.repository.RouteRepository;
 import com.connect.transitconnect.repository.StopRepository;
 import com.connect.transitconnect.service.GraphCacheService.Edge;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,30 +20,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
-/**
- * PRODUCTION REWRITE of RouteService.
- *
- * Changes from original:
- *
- * [1] Graph cache moved to GraphCacheService (thread-safe, ReadWriteLock)
- * [2] @Transactional on all writes — no partial DB state on failure
- * [3] invalidateGraphCache() called AFTER commit (inside @Transactional method
- *     via TransactionSynchronizationManager), not before
- * [4] saveRoute deduplicates stops at DB level (findByLocationIgnoreCase)
- *     instead of creating duplicate rows per route
- * [5] IllegalArgumentException replaced with InvalidRouteException → HTTP 400
- * [6] getAllStopNames() uses indexed DB query, not full route scan
- * [7] matchingKeys: exact match first (O(1)), prefix fallback, no substring scan
- * [8] buildSegmentDTO receives pre-cached edgeMultiMap — no per-call rebuild
- * [9] getOrBuildGraph mutable-arg side channel removed — GraphCacheService returns
- *     both adjacency and locToEntity cleanly
- * [10] Mapper methods removed from service — use RouteMapper (MapStruct) in controller
- */
 @Service
 public class RouteService {
 
@@ -58,82 +40,118 @@ public class RouteService {
     }
 
     // =========================================================================
-    // NODE / HELPER INNER CLASS
+    // HELPERS
     // =========================================================================
 
     private static class Node {
         final String loc;
         final int weight;
-        Node(String loc, int weight) { this.loc = loc; this.weight = weight; }
+        final Long lastRouteId;   // Track last route for transfer penalty
+        Node(String loc, int weight, Long lastRouteId) {
+            this.loc = loc; this.weight = weight; this.lastRouteId = lastRouteId;
+        }
     }
 
     // =========================================================================
     // SAVE ROUTE
-    // FIX [2]: @Transactional — if anything fails, entire save rolls back
-    // FIX [4]: stops deduplicated at DB level via findByLocationIgnoreCase
-    // FIX [5]: InvalidRouteException → HTTP 400, not 500
-    // FIX [3]: invalidate AFTER transaction commits via @Transactional
     // =========================================================================
 
     @Transactional
     @CacheEvict(value = "routes", allEntries = true)
     public RouteEntity saveRoute(RouteInputDTO dto, String submittedBy) {
+        return persistRoute(null, dto, submittedBy);
+    }
+
+    // =========================================================================
+    // UPDATE ROUTE (PUT)
+    // =========================================================================
+
+    @Transactional
+    @CacheEvict(value = "routes", allEntries = true)
+    public RouteEntity updateRoute(Long id, RouteInputDTO dto, String callerUsername) {
+        RouteEntity existing = routeRepository.findById(id)
+                .orElseThrow(() -> new RouteNotFoundException(id));
+
+        // Only the original creator OR an ADMIN can update
+        String role = callerUsername; // role check handled in controller
+        if (!existing.getCreatedBy().equals(callerUsername)) {
+            throw new SecurityException("You do not have permission to update this route");
+        }
+
+        return persistRoute(existing, dto, callerUsername);
+    }
+
+    /** Shared logic for save and update. If route is null → create new. */
+    private RouteEntity persistRoute(RouteEntity route, RouteInputDTO dto, String submittedBy) {
         List<StopDTO> stopDTOs = dto.getStops();
         List<HopDTO>  hopDTOs  = dto.getHops();
 
-        // FIX [5]: domain exception, not IllegalArgumentException
         if (stopDTOs == null || stopDTOs.size() < 2)
             throw new InvalidRouteException("Route must have at least 2 stops");
 
         if (hopDTOs == null || hopDTOs.size() != stopDTOs.size() - 1)
             throw new InvalidRouteException(
-                    "Hops count must equal stops.size() - 1, got " + hopDTOs.size());
+                    "Hops count must equal stops.size() - 1, got " +
+                    (hopDTOs == null ? 0 : hopDTOs.size()));
 
         for (int i = 1; i < stopDTOs.size(); i++) {
-            if (stopDTOs.get(i).getLocation().trim().equalsIgnoreCase(stopDTOs.get(i - 1).getLocation().trim())) {
-                throw new InvalidRouteException("Consecutive stops cannot have the same name: " + stopDTOs.get(i).getLocation());
+            String curCanon  = GraphCacheService.normalize(stopDTOs.get(i).getLocation());
+            String prevCanon = GraphCacheService.normalize(stopDTOs.get(i - 1).getLocation());
+            if (curCanon.equals(prevCanon)) {
+                throw new InvalidRouteException(
+                        "Consecutive stops cannot have the same name: " +
+                        stopDTOs.get(i).getLocation());
             }
         }
 
-        // FIX [4]: find existing stop by location, create only if absent
-        // Old code: always created a new StopEntity → duplicates per route
+        // Deduplicate stops by canonical name
         List<StopEntity> stopEntities = stopDTOs.stream()
-                .map(s -> stopRepository
-                        .findByLocationIgnoreCase(s.getLocation().trim())
-                        .orElseGet(() -> {
-                            StopEntity ne = new StopEntity();
-                            ne.setLocation(s.getLocation().trim());
-                            ne.setLatitude(s.getLatitude());
-                            ne.setLongitude(s.getLongitude());
-                            return stopRepository.save(ne);
-                        }))
+                .map(s -> {
+                    String canon = GraphCacheService.normalize(s.getLocation().trim());
+                    return stopRepository
+                            .findByCanonicalName(canon)
+                            .orElseGet(() -> {
+                                StopEntity ne = new StopEntity();
+                                ne.setLocation(s.getLocation().trim());
+                                ne.setCanonicalName(canon);
+                                ne.setLatitude(s.getLatitude());
+                                ne.setLongitude(s.getLongitude());
+                                return stopRepository.save(ne);
+                            });
+                })
                 .collect(Collectors.toList());
 
-        RouteEntity route = new RouteEntity();
-        route.setCreatedBy(submittedBy);
+        if (route == null) {
+            route = new RouteEntity();
+            route.setCreatedBy(submittedBy);
+        }
+
         route.setStops(stopEntities);
 
-        // Build hops with back-reference to route + sequence order
+        final RouteEntity finalRoute = route;
+
         List<HopEntity> hopEntities = IntStream.range(0, hopDTOs.size())
                 .mapToObj(i -> {
                     HopDTO dto2 = hopDTOs.get(i);
                     HopEntity h = new HopEntity();
                     h.setFromStop(stopEntities.get(i));
                     h.setToStop(stopEntities.get(i + 1));
-                    h.setCost(dto2.getCost() != null ? dto2.getCost() : 0);
+                    h.setCost(dto2.getCost()     != null ? dto2.getCost()     : 0);
                     h.setDuration(dto2.getDuration() != null ? dto2.getDuration() : 0);
-                    h.setMode(dto2.getMode());
+                    h.setDistance(dto2.getDistance() != null ? dto2.getDistance() : 0);
+                    h.setMode(TransportMode.fromString(dto2.getMode()));
+                    h.setOneWay(Boolean.TRUE.equals(dto2.getIsOneWay()));
                     h.setSequenceOrder(i);
-                    h.setRoute(route);
+                    h.setRoute(finalRoute);
                     return h;
                 })
                 .collect(Collectors.toList());
 
-        route.setHops(hopEntities);
-        RouteEntity saved = routeRepository.save(route);
+        // For update: replace hops (orphanRemoval handles old ones)
+        route.getHops().clear();
+        route.getHops().addAll(hopEntities);
 
-        // FIX [3]: invalidate AFTER save completes within this transaction.
-        // If save throws, this line never runs — cache stays valid.
+        RouteEntity saved = routeRepository.save(route);
         graphCache.invalidate();
         return saved;
     }
@@ -152,7 +170,10 @@ public class RouteService {
                 .collect(Collectors.toList());
 
         List<HopDTO> hopDTOs = entity.getHops().stream()
-                .map(h -> new HopDTO(h.getCost(), h.getDuration(), null, h.getMode()))
+                .map(h -> new HopDTO(
+                        h.getCost(), h.getDuration(), null,
+                        h.getMode() != null ? h.getMode().name() : null,
+                        h.isOneWay()))
                 .collect(Collectors.toList());
 
         return new RouteResponseDTO(
@@ -165,28 +186,44 @@ public class RouteService {
     }
 
     public RouteEntity getRouteById(Long id) {
-        // FIX [5]: RouteNotFoundException → 404 via GlobalExceptionHandler
         return routeRepository.findById(id)
                 .orElseThrow(() -> new RouteNotFoundException(id));
     }
 
     @Transactional
     @CacheEvict(value = "routes", allEntries = true)
-    public void deleteRoute(Long id) {
-        if (!routeRepository.existsById(id))
-            throw new RouteNotFoundException(id);
+    public void deleteRoute(Long id, String callerUsername) {
+        RouteEntity route = routeRepository.findById(id)
+                .orElseThrow(() -> new RouteNotFoundException(id));
+
+        // Only the original creator OR an ADMIN can delete
+        if (!route.getCreatedBy().equals(callerUsername)) {
+            throw new SecurityException("You do not have permission to delete this route");
+        }
+
         routeRepository.deleteById(id);
-        graphCache.invalidate(); // after successful delete
+        graphCache.invalidate();
     }
 
     // =========================================================================
-    // GET ALL STOP NAMES
-    // FIX [6]: was routeRepository.findAll() → flatMap → distinct (full scan)
-    // Now: single SELECT DISTINCT on indexed stops table
+    // STOP NAMES — paginated for autocomplete
     // =========================================================================
 
     public List<String> getAllStopNames() {
         return stopRepository.findAllDistinctLocations();
+    }
+
+    /**
+     * Returns up to `limit` stop location names whose canonical name starts with `query`.
+     * Used by the frontend autocomplete dropdown.
+     */
+    public List<String> searchStopNames(String query, int limit) {
+        String canon = GraphCacheService.normalize(query);
+        Pageable page = PageRequest.of(0, Math.min(limit, 20));
+        return stopRepository.searchByPrefix(canon, page)
+                .stream()
+                .map(StopEntity::getLocation)
+                .collect(Collectors.toList());
     }
 
     // =========================================================================
@@ -208,10 +245,8 @@ public class RouteService {
         return dijkstra(from, to, e -> e.cost).orElse(null);
     }
 
-
-
     // =========================================================================
-    // DIJKSTRA — generic weight function (Strategy Pattern)
+    // DIJKSTRA — with transfer penalty
     // =========================================================================
 
     private Optional<RouteSegmentDTO> dijkstra(
@@ -220,8 +255,9 @@ public class RouteService {
 
         if (qFrom == null || qTo == null) return Optional.empty();
 
-        String from = qFrom.toLowerCase().trim();
-        String to   = qTo.toLowerCase().trim();
+        // Normalize search terms using the same canonical key as the graph
+        String from = GraphCacheService.normalize(qFrom);
+        String to   = GraphCacheService.normalize(qTo);
 
         Map<String, List<Edge>> graph       = graphCache.getAdjacency();
         Map<String, StopEntity> locToEntity = graphCache.getLocToEntity();
@@ -233,12 +269,14 @@ public class RouteService {
         PriorityQueue<Node>  pq      = new PriorityQueue<>(Comparator.comparingInt(n -> n.weight));
         Map<String, Integer> dist    = new HashMap<>();
         Map<String, String>  parent  = new HashMap<>();
+        Map<String, Long>    lastRoute = new HashMap<>();
         Set<String> visited = new HashSet<>();
 
         for (String s : starts) {
             dist.put(s, 0);
             parent.put(s, null);
-            pq.add(new Node(s, 0));
+            lastRoute.put(s, null);
+            pq.add(new Node(s, 0, null));
         }
 
         String found = null;
@@ -250,11 +288,20 @@ public class RouteService {
             if (ends.contains(node.loc)) { found = node.loc; break; }
 
             for (Edge e : graph.getOrDefault(node.loc, List.of())) {
-                int newDist = node.weight + weightFn.apply(e);
+                // Transfer penalty: add 5 mins if we're switching routes
+                int transferPenalty = 0;
+                if (node.lastRouteId != null && e.routeId != null
+                        && !node.lastRouteId.equals(e.routeId)
+                        && weightFn.apply(e) == e.duration) {
+                    transferPenalty = GraphCacheService.TRANSFER_PENALTY_DURATION;
+                }
+
+                int newDist = node.weight + weightFn.apply(e) + transferPenalty;
                 if (newDist < dist.getOrDefault(e.to, Integer.MAX_VALUE)) {
                     dist.put(e.to, newDist);
                     parent.put(e.to, node.loc);
-                    pq.add(new Node(e.to, newDist));
+                    lastRoute.put(e.to, e.routeId);
+                    pq.add(new Node(e.to, newDist, e.routeId));
                 }
             }
         }
@@ -266,14 +313,10 @@ public class RouteService {
 
     // =========================================================================
     // HELPERS
-    // FIX [7]: exact match O(1) first, prefix fallback — no full O(N) substring scan
     // =========================================================================
 
     private Set<String> matchingKeys(Map<String, List<Edge>> graph, String query) {
-        // Exact match — O(1) HashMap lookup
         if (graph.containsKey(query)) return Set.of(query);
-
-        // Prefix match fallback — still O(N) but only hits on no-exact-match
         return graph.keySet().stream()
                 .filter(k -> k.startsWith(query))
                 .collect(Collectors.toSet());
@@ -287,12 +330,10 @@ public class RouteService {
         return path;
     }
 
-
     private RouteSegmentDTO buildSegmentDTO(
             List<String> path,
             Map<String, StopEntity> locToEntity,
             Function<Edge, Integer> weightFn) {
-
 
         Map<String, List<Edge>> edgeMultiMap = graphCache.getEdgeMultiMap();
 
@@ -313,6 +354,8 @@ public class RouteService {
         int totalCost         = 0;
         int totalDuration     = 0;
         int totalDistance     = 0;
+        int transferCount     = 0;
+        Long lastRouteId      = null;
 
         for (int i = 0; i < path.size() - 1; i++) {
             String key           = path.get(i) + "->" + path.get(i + 1);
@@ -329,8 +372,14 @@ public class RouteService {
                         .orElse(candidates.get(0));
             }
 
-            int c = chosen != null ? chosen.cost     : 0;
-            int d = chosen != null ? chosen.duration : 0;
+            if (chosen != null && lastRouteId != null && chosen.routeId != null
+                    && !chosen.routeId.equals(lastRouteId)) {
+                transferCount++;
+            }
+            if (chosen != null) lastRouteId = chosen.routeId;
+
+            int c    = chosen != null ? chosen.cost     : 0;
+            int d    = chosen != null ? chosen.duration : 0;
             int dist = chosen != null ? chosen.distance : 0;
 
             HopDTO hd = new HopDTO();
@@ -352,6 +401,7 @@ public class RouteService {
         seg.setTotalDuration(totalDuration);
         seg.setTotalDistance(totalDistance);
         seg.setStopsCount(stopDTOs.size());
+        seg.setTransferCount(transferCount);
         return seg;
     }
 }

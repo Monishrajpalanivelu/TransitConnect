@@ -9,37 +9,35 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.Function;
 
 @Service
 public class GraphCacheService {
 
-    private static final Logger log =
-            LoggerFactory.getLogger(GraphCacheService.class);
+    private static final Logger log = LoggerFactory.getLogger(GraphCacheService.class);
+
+    /**
+     * Transfer penalty applied in Dijkstra when the path switches from one route
+     * to another at an intermediate stop (i.e. the user must change vehicles).
+     * Unit: minutes (applied to the duration weight).
+     */
+    public static final int TRANSFER_PENALTY_DURATION = 5;
 
     // ---- Inner Edge type (package-visible for RouteService) -----------------
     static class Edge {
         final String to;
         final int cost, duration, distance;
         final String mode;
-        Edge(String to, int cost, int duration, String mode, int distance) {
-            this.to = to; this.cost = cost;
-            this.duration = duration; this.mode = mode;
-            this.distance = distance;
-        }
-    }
+        /** The route this hop belongs to — used for transfer detection in Dijkstra */
+        final Long routeId;
 
-    private int calculateDistance(Double lat1, Double lon1, Double lat2, Double lon2) {
-        if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return 1;
-        final int R = 6371; // Radius of the earth in km
-        double latDistance = Math.toRadians(lat2 - lat1);
-        double lonDistance = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        double distance = R * c * 1000; // convert to meters
-        return (int) Math.max(1, distance); // at least 1 meter to avoid 0 weight edges
+        Edge(String to, int cost, int duration, String mode, int distance, Long routeId) {
+            this.to = to;
+            this.cost = cost;
+            this.duration = duration;
+            this.mode = mode;
+            this.distance = distance;
+            this.routeId = routeId;
+        }
     }
 
     // ---- Immutable snapshot built once per cache miss -----------------------
@@ -73,15 +71,12 @@ public class GraphCacheService {
     // ---- Read-Write Lock pattern --------------------------------------------
 
     private GraphSnapshot getSnapshot() {
-        // Fast path — concurrent reads run in parallel, zero blocking
         lock.readLock().lock();
         try { if (snapshot != null) return snapshot; }
         finally { lock.readLock().unlock(); }
 
-        // Slow path — exclusive write lock for rebuild
         lock.writeLock().lock();
         try {
-            // Double-check: another thread may have built it while we waited
             if (snapshot != null) return snapshot;
             snapshot = buildGraph();
             return snapshot;
@@ -91,9 +86,6 @@ public class GraphCacheService {
     private GraphSnapshot buildGraph() {
         Instant start = Instant.now();
 
-        // ONE query — loads all hops with fromStop + toStop via JOIN FETCH
-        // Previously: findAll() on routes + N lazy loads = 2001 queries per 1000 routes
-        // Now: exactly 1 query regardless of data size
         List<HopEntity> allHops = hopRepository.findAllWithStops();
 
         Map<String, List<Edge>> adjacency   = new HashMap<>();
@@ -105,31 +97,33 @@ public class GraphCacheService {
             StopEntity to   = hop.getToStop();
             if (from == null || to == null) continue;
 
-            String u = from.getLocation().toLowerCase().trim();
-            String v = to.getLocation().toLowerCase().trim();
+            // Use canonical name as graph key for normalization
+            String u = normalize(from.getLocation());
+            String v = normalize(to.getLocation());
 
             locToEntity.putIfAbsent(u, from);
             locToEntity.putIfAbsent(v, to);
             adjacency.putIfAbsent(u, new ArrayList<>());
             adjacency.putIfAbsent(v, new ArrayList<>());
 
-            int dist = calculateDistance(from.getLatitude(), from.getLongitude(), to.getLatitude(), to.getLongitude());
+            int dist = Math.max(1, hop.getDistance());
+            String modeStr = hop.getMode() != null ? hop.getMode().name() : "BUS";
+            Long routeId = hop.getRoute() != null ? hop.getRoute().getId() : null;
 
-            Edge fwd = new Edge(v, hop.getCost(), hop.getDuration(), hop.getMode(), dist);
-            Edge bwd = new Edge(u, hop.getCost(), hop.getDuration(), hop.getMode(), dist);
-
+            Edge fwd = new Edge(v, hop.getCost(), hop.getDuration(), modeStr, dist, routeId);
             adjacency.get(u).add(fwd);
-            adjacency.get(v).add(bwd);
-
-            // Pre-build edgeMultiMap — eliminates per-search rebuild (was old bug)
             multiMap.computeIfAbsent(u + "->" + v, k -> new ArrayList<>()).add(fwd);
-            multiMap.computeIfAbsent(v + "->" + u, k -> new ArrayList<>()).add(bwd);
+
+            // FIX: Only create reverse edge if the hop is NOT one-way
+            if (!hop.isOneWay()) {
+                Edge bwd = new Edge(u, hop.getCost(), hop.getDuration(), modeStr, dist, routeId);
+                adjacency.get(v).add(bwd);
+                multiMap.computeIfAbsent(v + "->" + u, k -> new ArrayList<>()).add(bwd);
+            }
         }
 
         long ms = Instant.now().toEpochMilli() - start.toEpochMilli();
-        // RESUME METRIC — log this number
-        log.info("Graph built: {} nodes, {} hops, {}ms",
-                adjacency.size(), allHops.size(), ms);
+        log.info("Graph built: {} nodes, {} hops, {}ms", adjacency.size(), allHops.size(), ms);
 
         return new GraphSnapshot(
                 Collections.unmodifiableMap(adjacency),
@@ -137,5 +131,11 @@ public class GraphCacheService {
                 Collections.unmodifiableMap(locToEntity),
                 allHops.size(), start
         );
+    }
+
+    /** Normalizes a stop name to a canonical graph key: lowercase, alphanumeric + spaces only. */
+    public static String normalize(String name) {
+        if (name == null) return "";
+        return name.toLowerCase().trim().replaceAll("[^a-z0-9 ]", "").replaceAll("\\s+", " ").trim();
     }
 }

@@ -17,8 +17,8 @@ export default function Dashboard() {
       const [error, setError] = useState("");
       const navigate = useNavigate();
 
-      // handleSearch now accepts mode (from SearchBar)
-      const handleSearch = async (from, to, mode = "shortest") => {
+      // handleSearch now calls searchRoutes without mode
+      const handleSearch = async (from, to) => {
             setError("");
             setResult(null);
 
@@ -28,7 +28,7 @@ export default function Dashboard() {
             }
 
             try {
-                  const data = await searchRoutes(from, to, mode);
+                  const data = await searchRoutes(from, to);
                   setResult(data);
             } catch (e) {
                   const msg = e?.message || "Search failed";

@@ -60,7 +60,7 @@ class RouteServiceTest {
     }
 
     private HopDTO hop() {
-        return new HopDTO(10, 20, "Bus");
+        return new HopDTO(10, 20, 100, "Bus", false);
     }
 
     // -------------------------------------------------------------------------
@@ -185,7 +185,7 @@ class RouteServiceTest {
         when(routeRepository.existsById(999L)).thenReturn(false);
 
         assertThrows(RouteNotFoundException.class,
-                () -> routeService.deleteRoute(999L));
+                () -> routeService.deleteRoute(999L, "testuser"));
     }
 
     // -------------------------------------------------------------------------

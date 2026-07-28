@@ -3,6 +3,7 @@ package com.connect.transitconnect.controller;
 import com.connect.transitconnect.dto.AuthResponse;
 import com.connect.transitconnect.dto.LoginRequest;
 import com.connect.transitconnect.service.AuthService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,7 +25,7 @@ public class AuthController {
       }
 
       @PostMapping("/register")
-      public ResponseEntity<String> register(@RequestBody com.connect.transitconnect.dto.RegisterRequest request) {
+      public ResponseEntity<String> register(@Valid @RequestBody com.connect.transitconnect.dto.RegisterRequest request) {
             return ResponseEntity.ok(authService.register(request));
       }
 }

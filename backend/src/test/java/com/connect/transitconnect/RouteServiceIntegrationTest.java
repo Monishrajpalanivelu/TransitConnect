@@ -22,7 +22,7 @@ public class RouteServiceIntegrationTest extends AbstractIntegrationTest {
         // Arrange: Create a sample route payload
         StopDTO stop1 = new StopDTO("Test Station A", 12.9716, 77.5946);
         StopDTO stop2 = new StopDTO("Test Station B", 12.9352, 77.6245);
-        HopDTO hop = new HopDTO(15, 30, "Bus");
+        HopDTO hop = new HopDTO(15, 30, 200, "Bus", false);
 
         RouteInputDTO inputDTO = new RouteInputDTO();
         inputDTO.setStops(List.of(stop1, stop2));
