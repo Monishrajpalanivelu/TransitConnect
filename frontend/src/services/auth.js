@@ -9,7 +9,7 @@ export const login = async (username, password) => {
             const response = await axios.post(`${API_URL}/login`, {
                   username,
                   password,
-            });
+            }, { timeout: 15000 }); // 15 second timeout
             if (response.data.token) {
                   localStorage.setItem("token", response.data.token);
                   localStorage.setItem("role", response.data.role);
@@ -26,7 +26,7 @@ export const register = async (username, email, password) => {
                   username,
                   email,
                   password,
-            });
+            }, { timeout: 15000 }); // 15 second timeout
             return response.data;
       } catch (error) {
             throw error;

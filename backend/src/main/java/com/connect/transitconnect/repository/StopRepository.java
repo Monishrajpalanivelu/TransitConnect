@@ -22,8 +22,8 @@ public interface StopRepository extends JpaRepository<StopEntity, Long> {
     @Query("SELECT s FROM StopEntity s WHERE s.canonicalName LIKE LOWER(CONCAT(:prefix, '%')) ORDER BY s.location")
     Page<StopEntity> searchByPrefix(@Param("prefix") String prefix, Pageable pageable);
 
-    // All distinct stop location names — used only in getAllStopNames
-    @Query("SELECT s.location FROM StopEntity s ORDER BY s.location")
+    // All distinct stop names that are currently used in at least one route
+    @Query("SELECT DISTINCT LOWER(s.location) FROM RouteEntity r JOIN r.stops s ORDER BY LOWER(s.location)")
     List<String> findAllDistinctLocations();
 
     // All stops that are actually referenced by hops (graph nodes only)

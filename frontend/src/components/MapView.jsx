@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
+import { GeoSearchControl, OpenStreetMapProvider } from "leaflet-geosearch";
+import "leaflet-geosearch/dist/geosearch.css";
 
 import iconUrl from "leaflet/dist/images/marker-icon.png";
 import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
@@ -20,6 +22,32 @@ function ClickHandler({ onClick }) {
       if (onClick) onClick([e.latlng.lat, e.latlng.lng]);
     }
   });
+  return null;
+}
+
+function SearchControl() {
+  const map = useMap();
+
+  useEffect(() => {
+    const provider = new OpenStreetMapProvider();
+    const searchControl = new GeoSearchControl({
+      provider: provider,
+      style: "bar",
+      showMarker: true, 
+      retainZoomLevel: false,
+      animateZoom: true,
+      autoClose: true,
+      searchLabel: "Search places...",
+      keepResult: true,
+    });
+
+    map.addControl(searchControl);
+
+    return () => {
+      map.removeControl(searchControl);
+    };
+  }, [map]);
+
   return null;
 }
 
@@ -160,6 +188,8 @@ export default function MapView({ stops = [], hops = [], multiRoutes = [], onRou
           attribution='© OpenStreetMap contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        
+        <SearchControl />
 
         <MapUpdater stops={allStops} />
         {onMapClick && <ClickHandler onClick={onMapClick} />}

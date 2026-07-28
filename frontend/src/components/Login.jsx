@@ -11,6 +11,7 @@ const Login = () => {
       });
       const [error, setError] = useState('');
       const [success, setSuccess] = useState('');
+      const [isLoading, setIsLoading] = useState(false);
       const navigate = useNavigate();
 
       const handleChange = (e) => {
@@ -25,6 +26,7 @@ const Login = () => {
             e.preventDefault();
             setError('');
             setSuccess('');
+            setIsLoading(true);
             try {
                   if (isLogin) {
                         await login(credentials.username, credentials.password);
@@ -38,71 +40,86 @@ const Login = () => {
             } catch (err) {
                   console.error('Auth failed:', err);
                   setError(err.response?.data?.message || (isLogin ? 'Invalid credentials' : 'Registration failed'));
+            } finally {
+                  setIsLoading(false);
             }
       };
 
       return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100" style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f4f6' }}>
-                  <div className="w-full max-w-md p-8 space-y-6 bg-white rounded shadow-md" style={{ width: '100%', maxWidth: '400px', padding: '2rem', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-                        <h2 className="text-2xl font-bold text-center" style={{ textAlign: 'center', marginBottom: '1.5rem', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                              {isLogin ? 'Login to TransitConnect' : 'Sign Up for TransitConnect'}
-                        </h2>
-                        {error && <div style={{ color: 'red', marginBottom: '1rem', textAlign: 'center' }}>{error}</div>}
-                        {success && <div style={{ color: 'green', marginBottom: '1rem', textAlign: 'center' }}>{success}</div>}
+            <div className="page-container flex-center" style={{ minHeight: '100vh', padding: '1rem', background: 'linear-gradient(135deg, #F8FAFC, #E0E7FF)' }}>
+                  <div className="glass-card animate-slide-up" style={{ width: '100%', maxWidth: '420px', padding: '2.5rem', background: 'white' }}>
+                        
+                        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                              <h2 className="heading-1" style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>TransitConnect</h2>
+                              <p className="text-muted">{isLogin ? 'Welcome back! Please sign in.' : 'Create your account to join.'}</p>
+                        </div>
 
-                        <form className="space-y-4" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {error && <div className="alert-warning" style={{ marginBottom: '1.5rem', borderLeftColor: 'var(--color-error)', color: '#B91C1C', background: '#FEF2F2' }}>{error}</div>}
+                        {success && <div className="alert-info" style={{ marginBottom: '1.5rem', borderLeftColor: 'var(--color-success)', color: '#047857', background: '#ECFDF5' }}>{success}</div>}
+
+                        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                               <div>
-                                    <label className="block text-sm font-medium text-gray-700" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Username</label>
+                                    <label className="label">Username</label>
                                     <input
+                                          className="input-field"
                                           type="text"
                                           name="username"
                                           value={credentials.username}
                                           onChange={handleChange}
                                           required
-                                          style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                                          placeholder="Enter your username"
                                     />
                               </div>
 
                               {!isLogin && (
-                                    <div>
-                                          <label className="block text-sm font-medium text-gray-700" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Email</label>
+                                    <div className="animate-fade-in">
+                                          <label className="label">Email Address</label>
                                           <input
+                                                className="input-field"
                                                 type="email"
                                                 name="email"
                                                 value={credentials.email}
                                                 onChange={handleChange}
                                                 required
-                                                style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                                                placeholder="you@example.com"
                                           />
                                     </div>
                               )}
 
                               <div>
-                                    <label className="block text-sm font-medium text-gray-700" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Password</label>
+                                    <label className="label">Password</label>
                                     <input
+                                          className="input-field"
                                           type="password"
                                           name="password"
                                           value={credentials.password}
                                           onChange={handleChange}
                                           required
-                                          style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                                          placeholder="••••••••"
                                     />
                               </div>
+
                               <button
                                     type="submit"
-                                    style={{ width: '100%', padding: '0.75rem', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}
+                                    className="btn-primary"
+                                    disabled={isLoading}
+                                    style={{ marginTop: '0.5rem', width: '100%', opacity: isLoading ? 0.7 : 1 }}
                               >
-                                    {isLogin ? 'Sign In' : 'Sign Up'}
+                                    {isLoading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
                               </button>
                         </form>
 
-                        <div style={{ marginTop: '1rem', textAlign: 'center' }}>
-                              <button
-                                    onClick={() => { setIsLogin(!isLogin); setError(''); setSuccess(''); }}
-                                    style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}
-                              >
-                                    {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Login"}
-                              </button>
+                        <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+                              <p className="text-muted" style={{ margin: 0 }}>
+                                    {isLogin ? "Don't have an account? " : "Already have an account? "}
+                                    <button
+                                          type="button"
+                                          onClick={() => { setIsLogin(!isLogin); setError(''); setSuccess(''); }}
+                                          style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                                    >
+                                          {isLogin ? "Sign Up" : "Log In"}
+                                    </button>
+                              </p>
                         </div>
                   </div>
             </div>

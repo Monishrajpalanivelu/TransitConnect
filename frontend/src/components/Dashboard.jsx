@@ -1,19 +1,18 @@
 import { useState } from "react";
-import { styles } from "../styles/styles";
-// NOTE: Ensure your SearchBar component file is named SearchBar.jsx under /src/components
-import SearchBar from "./SearchBox"; // Assuming this is correct based on original App.js
+import SearchBar from "./SearchBox";
 import RouteCard from "./RouteCard";
-import BottomNav from "./BottomNav";
+import TopNav from "./TopNav";
 import AddRouteModal from "./AddRouteModal";
+import ManageRoutes from "./ManageRoutes";
 import { searchRoutes } from "../services/api";
 import { logout } from "../services/auth";
 import { useNavigate } from "react-router-dom";
-
 import Welcome from "./Welcome";
 
 export default function Dashboard() {
       const [result, setResult] = useState(null);
       const [showAdd, setShowAdd] = useState(false);
+      const [showManage, setShowManage] = useState(false);
       const [error, setError] = useState("");
       const navigate = useNavigate();
 
@@ -21,18 +20,15 @@ export default function Dashboard() {
       const handleSearch = async (from, to) => {
             setError("");
             setResult(null);
-
             if (!from || !to) {
                   alert("Enter both fields");
                   return;
             }
-
             try {
                   const data = await searchRoutes(from, to);
                   setResult(data);
             } catch (e) {
-                  const msg = e?.message || "Search failed";
-                  setError(msg);
+                  setError(e?.message || "Search failed");
             }
       };
 
@@ -42,34 +38,30 @@ export default function Dashboard() {
       };
 
       return (
-            <div style={styles.page}>
-                  <div style={styles.container}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                              <h2 style={{ margin: 0 }}>TransitConnect</h2>
-                              <button onClick={handleLogout} style={{ padding: '5px 10px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Logout</button>
-                        </div>
-
-                        {/* Welcome / Guidelines */}
-                        {!showAdd && !result && <Welcome />}
-
-                        {/* Search */}
-                        {!showAdd && <SearchBar onSearch={handleSearch} />}
-
-                        {/* Error */}
-                        {!showAdd && error && <div style={{ color: "red", marginTop: 8 }}>{error}</div>}
-
-                        {/* Results */}
-                        {!showAdd && result && <RouteCard data={result} />}
-
-                        {/* Add Route */}
-                        {showAdd && <AddRouteModal onClose={() => setShowAdd(false)} />}
-
-                        <BottomNav
-                              onHome={() => { setShowAdd(false); setResult(null); setError(""); }}
-                              onAdd={() => setShowAdd(true)}
-                              onTop={() => alert("Coming soon")}
-                        />
+            <div className="page-container animate-fade-in">
+                  <div className="flex-between" style={{ marginBottom: "2rem" }}>
+                        <h2 className="heading-1" style={{ margin: 0, fontSize: "1.75rem" }}>TransitConnect</h2>
+                        <button className="btn-danger" onClick={handleLogout} style={{ borderRadius: "9999px" }}>Logout</button>
                   </div>
+
+                  {!showAdd && !showManage && !result && <Welcome />}
+                  {!showAdd && !showManage && <SearchBar onSearch={handleSearch} />}
+                  
+                  {!showAdd && !showManage && error && (
+                        <div className="glass-card animate-slide-up" style={{ color: "var(--color-error)", borderLeft: "4px solid var(--color-error)" }}>
+                              {error}
+                        </div>
+                  )}
+
+                  {!showAdd && !showManage && result && <RouteCard data={result} />}
+                  {showAdd && <AddRouteModal onClose={() => setShowAdd(false)} />}
+                  {showManage && <ManageRoutes />}
+
+                  <TopNav
+                        onHome={() => { setShowAdd(false); setShowManage(false); setResult(null); setError(""); }}
+                        onAdd={() => { setShowAdd(true); setShowManage(false); }}
+                        onManage={() => { setShowManage(true); setShowAdd(false); }}
+                  />
             </div>
       );
 }

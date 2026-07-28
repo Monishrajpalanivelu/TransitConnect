@@ -65,6 +65,14 @@ public class GlobalExceptionHandler {
                         "Malformed JSON request or invalid data types", Instant.now()));
     }
 
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatusException(org.springframework.web.server.ResponseStatusException ex) {
+        return ResponseEntity
+                .status(ex.getStatusCode())
+                .body(new ErrorResponse(ex.getStatusCode().value(), "Error",
+                        ex.getReason(), Instant.now()));
+    }
+
     // Catch-all — never expose stack traces to client
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneric(Exception ex) {

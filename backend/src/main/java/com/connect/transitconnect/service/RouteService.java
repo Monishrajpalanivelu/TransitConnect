@@ -104,7 +104,13 @@ public class RouteService {
             }
         }
 
+        // Validate each hop to prevent insensible inputs (impossible speeds, walk over limits, high costs)
+        for (int i = 0; i < hopDTOs.size(); i++) {
+            validateHop(hopDTOs.get(i), stopDTOs.get(i), stopDTOs.get(i + 1));
+        }
+
         // Deduplicate stops by canonical name
+        // find existing stop by location, create only if absent
         List<StopEntity> stopEntities = stopDTOs.stream()
                 .map(s -> {
                     String canon = GraphCacheService.normalize(s.getLocation().trim());
@@ -130,6 +136,7 @@ public class RouteService {
 
         final RouteEntity finalRoute = route;
 
+        // Build hops with back-reference to route + sequence order
         List<HopEntity> hopEntities = IntStream.range(0, hopDTOs.size())
                 .mapToObj(i -> {
                     HopDTO dto2 = hopDTOs.get(i);
@@ -200,7 +207,6 @@ public class RouteService {
         if (!route.getCreatedBy().equals(callerUsername)) {
             throw new SecurityException("You do not have permission to delete this route");
         }
-
         routeRepository.deleteById(id);
         graphCache.invalidate();
     }
@@ -243,6 +249,47 @@ public class RouteService {
     @Cacheable(value = "routes", key = "'mincost_' + #from + '_' + #to", unless = "#result == null")
     public RouteSegmentDTO findMinCostPath(String from, String to) {
         return dijkstra(from, to, e -> e.cost).orElse(null);
+    }
+
+    // =========================================================================
+    // BFS — minimum hops
+    // =========================================================================
+
+    private Optional<RouteSegmentDTO> bfsSearch(String qFrom, String qTo) {
+        if (qFrom == null || qTo == null) return Optional.empty();
+
+        String from = qFrom.toLowerCase().trim();
+        String to   = qTo.toLowerCase().trim();
+
+        // FIX : no mutable-arg side channel — get both maps from cache cleanly
+        Map<String, List<Edge>> graph       = graphCache.getAdjacency();
+        Map<String, StopEntity> locToEntity = graphCache.getLocToEntity();
+
+        Set<String> starts = matchingKeys(graph, from);
+        Set<String> ends   = matchingKeys(graph, to);
+        if (starts.isEmpty() || ends.isEmpty()) return Optional.empty();
+
+        Queue<String>       queue   = new ArrayDeque<>(starts);
+        Set<String>         visited = new HashSet<>(starts);
+        Map<String, String> parent  = new HashMap<>();
+        starts.forEach(s -> parent.put(s, null));
+
+        String found = null;
+        while (!queue.isEmpty()) {
+            String curr = queue.poll();
+            if (ends.contains(curr)) { found = curr; break; }
+            for (Edge e : graph.getOrDefault(curr, List.of())) {
+                if (!visited.contains(e.to)) {
+                    visited.add(e.to);
+                    parent.put(e.to, curr);
+                    queue.add(e.to);
+                }
+            }
+        }
+
+        if (found == null) return Optional.empty();
+        return Optional.of(buildSegmentDTO(
+                reconstructPath(found, parent), locToEntity, null));
     }
 
     // =========================================================================
@@ -330,10 +377,14 @@ public class RouteService {
         return path;
     }
 
+    // =========================================================================
+    // BUILD SEGMENT DTO
+    // =========================================================================
     private RouteSegmentDTO buildSegmentDTO(
             List<String> path,
             Map<String, StopEntity> locToEntity,
             Function<Edge, Integer> weightFn) {
+
 
         Map<String, List<Edge>> edgeMultiMap = graphCache.getEdgeMultiMap();
 
@@ -403,5 +454,60 @@ public class RouteService {
         seg.setStopsCount(stopDTOs.size());
         seg.setTransferCount(transferCount);
         return seg;
+    }
+
+    private void validateHop(HopDTO hop, StopDTO fromStop, StopDTO toStop) {
+        String mode = hop.getMode() != null ? hop.getMode().toUpperCase().trim() : "";
+        double durationInMinutes = hop.getDuration() != null ? hop.getDuration() : 0;
+        double cost = hop.getCost() != null ? hop.getCost() : 0;
+
+        Double lat1 = fromStop.getLatitude();
+        Double lon1 = fromStop.getLongitude();
+        Double lat2 = toStop.getLatitude();
+        Double lon2 = toStop.getLongitude();
+
+        if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) {
+            return; // Skip geo-distance checks if coordinates are missing
+        }
+
+        // Calculate geographical straight-line distance in kilometers
+        double geoDistanceKm = calculateHaversineDistance(lat1, lon1, lat2, lon2);
+
+        // 1. Walking mode constraints (No Walks > 10km, walks should be free, speed limit check)
+        if ("WALK".equals(mode) || "WALKING".equals(mode)) {
+            if (geoDistanceKm > 10.0) {
+                throw new InvalidRouteException("Walking connections cannot exceed 10 kilometers. Tried: " + fromStop.getLocation() + " to " + toStop.getLocation());
+            }
+            if (cost > 0.0) {
+                throw new InvalidRouteException("Walking connections must be free ($0).");
+            }
+            if (durationInMinutes > 0) {
+                double speedKmh = geoDistanceKm / (durationInMinutes / 60.0);
+                if (speedKmh > 10.0) {
+                    throw new InvalidRouteException("Walking speed is physically impossible (" + Math.round(speedKmh) + " km/h) from " + fromStop.getLocation() + " to " + toStop.getLocation());
+                }
+            }
+        }
+
+        // 2. Generic vehicular speed limits to prevent data entries that are "teleporting" (e.g. 50km in 1 minute = 3000 km/h)
+        if (durationInMinutes > 0) {
+            double speedKmh = geoDistanceKm / (durationInMinutes / 60.0);
+            if (speedKmh > 150.0) {
+                throw new InvalidRouteException("The speed of transit between " + fromStop.getLocation() + " and " + toStop.getLocation() + " is physically impossible (" + Math.round(speedKmh) + " km/h).");
+            }
+        }
+    }
+
+    private double calculateHaversineDistance(double lat1, double lon1, double lat2, double lon2) {
+        final int R = 6371; // Earth's radius in km
+        double latDistance = Math.toRadians(lat2 - lat1);
+        double lonDistance = Math.toRadians(lon2 - lon1);
+
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c; // Distance in km
     }
 }

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { addRoute } from "../services/api";
-import { styles } from "../styles/styles";
 import MapView from "./MapView";
 
 export default function AddRouteModal({ onClose }) {
@@ -18,6 +17,15 @@ export default function AddRouteModal({ onClose }) {
     setHops(prev => [...prev, { cost: "", duration: "", mode: "Bus", isOneWay: false }]);
   };
 
+  const removeStop = (idx) => {
+    if (stops.length <= 2) {
+      alert("A route must have at least 2 stops.");
+      return;
+    }
+    setStops(prev => prev.filter((_, i) => i !== idx));
+    setHops(prev => prev.filter((_, i) => i !== Math.min(idx, prev.length - 1)));
+  };
+
   const updateStop = (idx, key, val) =>
     setStops(prev => prev.map((s, i) => (i === idx ? { ...s, [key]: val } : s)));
 
@@ -29,9 +37,6 @@ export default function AddRouteModal({ onClose }) {
     if (idx !== -1) {
       updateStop(idx, "latitude", latlng[0]);
       updateStop(idx, "longitude", latlng[1]);
-      // Do NOT auto-set a name — the user must type a real stop name
-    } else {
-      // All stops placed, ignore extra map clicks
     }
   };
 
@@ -46,7 +51,6 @@ export default function AddRouteModal({ onClose }) {
   };
 
   const submit = async () => {
-    // Validation
     for (let s of stops) {
       if (!s.location || !s.location.trim()) return alert("Each stop must have a name.");
       if (s.latitude == null || s.longitude == null)
@@ -57,14 +61,12 @@ export default function AddRouteModal({ onClose }) {
       if (h.duration === "" || h.duration < 0) return alert("Enter a valid duration (0 or more) for all hops.");
     }
 
-    // Extract selected alternative index
     let selectedIndex = 0;
     if (selectedRouteId && selectedRouteId.includes("-alt")) {
       const match = selectedRouteId.match(/-alt(\d+)/);
       if (match) selectedIndex = parseInt(match[1]);
     }
 
-    // Fetch distance from OSRM for the ENTIRE route
     const updatedHops = hops.map(h => ({ ...h }));
     try {
       const coordsString = stops.map(s => `${s.longitude},${s.latitude}`).join(";");
@@ -104,34 +106,21 @@ export default function AddRouteModal({ onClose }) {
   };
 
   return (
-    <div style={{ ...styles.card, width: "600px", maxWidth: "90vw", position: "relative" }}>
+    <div className="modal-backdrop animate-fade-in" onClick={onClose}>
       {showMapOverlay ? (
-        <div style={{
-          display: "flex", flexDirection: "column", height: "600px",
-          backgroundColor: "#fff", borderRadius: 8, overflow: "hidden"
-        }}>
-          <div style={{
-            padding: "10px 15px", backgroundColor: "#f8f9fa",
-            borderBottom: "1px solid #ddd", display: "flex",
-            justifyContent: "space-between", alignItems: "center", flexShrink: 0
-          }}>
+        <div className="modal-content animate-slide-up" style={{ width: "90vw", height: "90vh", display: "flex", flexDirection: "column", padding: 0 }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ padding: "1rem 1.5rem", borderBottom: "1px solid var(--color-border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--color-bg)" }}>
             <div>
-              <span style={{ fontWeight: "bold" }}>Map Selection</span>
-              <p style={{ margin: 0, fontSize: 12, color: "#555" }}>
+              <h3 className="heading-3" style={{ margin: 0 }}>Map Selection</h3>
+              <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--color-text-light)" }}>
                 Click map to place pins. Click a blue/green line to select a path.
               </p>
             </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button
-                style={{ padding: "6px 12px", borderRadius: 4, border: "1px solid #ccc", cursor: "pointer" }}
-                onClick={undoLastPin}
-              >
+            <div style={{ display: "flex", gap: "1rem" }}>
+              <button className="btn-secondary" onClick={undoLastPin}>
                 ↩ Undo Last Pin
               </button>
-              <button
-                style={{ ...styles.blueBtn, padding: "6px 12px" }}
-                onClick={() => setShowMapOverlay(false)}
-              >
+              <button className="btn-primary" onClick={() => setShowMapOverlay(false)}>
                 ✓ Done
               </button>
             </div>
@@ -149,60 +138,75 @@ export default function AddRouteModal({ onClose }) {
           </div>
         </div>
       ) : (
-        <>
-          <h3>Add Route</h3>
-          <p style={{ fontSize: 13, color: "#666", marginBottom: 15 }}>
-            Enter stop names, fill in costs and durations, then pick pins on the map.
-          </p>
+        <div className="modal-content animate-slide-up" onClick={(e) => e.stopPropagation()}>
+          <div style={{ padding: "1.5rem", borderBottom: "1px solid var(--color-border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h3 className="heading-3" style={{ margin: 0 }}>Add a New Route</h3>
+            <button className="btn-ghost" onClick={onClose} style={{ fontSize: "1.25rem", padding: "0.25rem 0.5rem" }}>×</button>
+          </div>
+          
+          <div style={{ padding: "1.5rem", maxHeight: "60vh", overflowY: "auto" }}>
+            <div className="alert-info" style={{ marginBottom: "1.5rem", fontSize: "0.875rem" }}>
+              Add stops in order, specify the transit mode, and drop pins on the map.
+            </div>
 
-          <div style={{ maxHeight: "50vh", overflowY: "auto", marginBottom: 15, paddingRight: 10 }}>
             {stops.map((s, i) => (
-              <div key={i} style={{ marginBottom: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontWeight: "bold", minWidth: 18 }}>{i + 1}.</span>
-                  <input
-                    style={{ ...styles.input, flex: 1, marginBottom: 0 }}
-                    value={s.location}
-                    placeholder={`Stop ${i + 1} name (e.g. Majestic)`}
-                    onChange={(e) => updateStop(i, "location", e.target.value)}
-                  />
-                  <span style={{ fontSize: 12, color: s.latitude ? "green" : "#e53e3e", minWidth: 80 }}>
-                    {s.latitude ? "📍 Placed" : "No pin"}
-                  </span>
+              <div key={i} style={{ marginBottom: "2rem", background: "var(--color-bg)", padding: "1rem", borderRadius: "var(--radius-md)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                  <label className="label" style={{ margin: 0 }}>Stop {i + 1}</label>
+                  <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                    <span style={{ fontSize: "0.8rem", color: s.latitude ? "#10B981" : "#EF4444", fontWeight: 500 }}>
+                      {s.latitude ? "📍 Placed on Map" : "No pin"}
+                    </span>
+                    {stops.length > 2 && (
+                      <button 
+                        className="btn-ghost" 
+                        onClick={() => removeStop(i)} 
+                        style={{ color: "#DC2626", fontSize: "0.8rem", padding: "0.25rem 0.5rem", fontWeight: 600 }}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
                 </div>
+                <input
+                  className="input-field"
+                  style={{ marginBottom: "1rem" }}
+                  value={s.location}
+                  placeholder={`Name of Stop ${i + 1}`}
+                  onChange={(e) => updateStop(i, "location", e.target.value)}
+                />
 
                 {i < hops.length && (
-                  <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginTop: 8, paddingLeft: 26, flexWrap: "wrap" }}>
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      <span style={{ fontSize: 11, fontWeight: "bold", color: "#555" }}>Cost (₹)</span>
+                  <div style={{ marginTop: "1rem", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "0.5rem", alignItems: "end" }}>
+                    <div>
+                      <label className="label" style={{ fontSize: "0.75rem" }}>Cost (₹)</label>
                       <input
+                        className="input-field"
                         type="number"
-                        style={{ width: 75, padding: "5px 6px", borderRadius: 4, border: "1px solid #ccc" }}
                         min="0"
                         value={hops[i].cost}
-                        placeholder="0"
+                        placeholder="e.g. 20"
                         onChange={(e) => updateHop(i, "cost", e.target.value === "" ? "" : Number(e.target.value))}
                       />
                     </div>
-
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      <span style={{ fontSize: 11, fontWeight: "bold", color: "#555" }}>Duration (min)</span>
+                    <div>
+                      <label className="label" style={{ fontSize: "0.75rem" }}>Duration (m)</label>
                       <input
+                        className="input-field"
                         type="number"
-                        style={{ width: 85, padding: "5px 6px", borderRadius: 4, border: "1px solid #ccc" }}
                         min="0"
                         value={hops[i].duration}
-                        placeholder="0"
+                        placeholder="e.g. 15"
                         onChange={(e) => updateHop(i, "duration", e.target.value === "" ? "" : Number(e.target.value))}
                       />
                     </div>
-
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      <span style={{ fontSize: 11, fontWeight: "bold", color: "#555" }}>Mode</span>
+                    <div>
+                      <label className="label" style={{ fontSize: "0.75rem" }}>Mode</label>
                       <select
-                        style={{ padding: "5px 6px", borderRadius: 4, border: "1px solid #ccc" }}
+                        className="input-field"
                         value={hops[i].mode}
                         onChange={(e) => updateHop(i, "mode", e.target.value)}
+                        style={{ cursor: "pointer" }}
                       >
                         <option>Bus</option>
                         <option>Metro</option>
@@ -210,16 +214,15 @@ export default function AddRouteModal({ onClose }) {
                         <option>Auto</option>
                       </select>
                     </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, paddingBottom: 2 }}>
+                    <div style={{ display: "flex", alignItems: "center", paddingBottom: "0.6rem" }}>
                       <input
                         type="checkbox"
                         id={`oneway-${i}`}
                         checked={hops[i].isOneWay || false}
                         onChange={(e) => updateHop(i, "isOneWay", e.target.checked)}
-                        style={{ width: 14, height: 14, cursor: "pointer" }}
+                        style={{ marginRight: "0.5rem", cursor: "pointer" }}
                       />
-                      <label htmlFor={`oneway-${i}`} style={{ fontSize: 12, color: "#555", cursor: "pointer" }}>
+                      <label htmlFor={`oneway-${i}`} style={{ fontSize: "0.8rem", cursor: "pointer", color: "var(--color-text-light)" }}>
                         One-way →
                       </label>
                     </div>
@@ -228,31 +231,23 @@ export default function AddRouteModal({ onClose }) {
               </div>
             ))}
 
-            <button
-              style={{ ...styles.blueBtn, padding: "5px 10px", fontSize: 13, backgroundColor: "#6c757d" }}
-              onClick={addStop}
-            >
-              + Add Stop
-            </button>
-          </div>
-
-          <div style={{ marginTop: 15, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <button
-              style={{ ...styles.blueBtn, padding: "8px 16px", backgroundColor: "#28a745" }}
-              onClick={() => setShowMapOverlay(true)}
-            >
-              🗺️ Pick Stops on Map
-            </button>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button style={{ padding: "8px 16px", borderRadius: 5, border: "1px solid #ccc", cursor: "pointer", background: "white" }} onClick={onClose}>
-                Cancel
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
+              <button className="btn-secondary" onClick={addStop}>
+                + Add Another Stop
               </button>
-              <button style={{ ...styles.blueBtn, padding: "8px 16px" }} onClick={submit}>
-                Submit Route
+            </div>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
+              <button className="btn-primary" style={{ backgroundColor: "#10B981", borderColor: "#10B981" }} onClick={() => setShowMapOverlay(true)}>
+                🗺️ Pick Stops on Map
               </button>
             </div>
           </div>
-        </>
+
+          <div style={{ padding: "1.25rem 1.5rem", borderTop: "1px solid var(--color-border)", display: "flex", justifyContent: "flex-end", gap: "1rem", background: "var(--color-bg)", borderBottomLeftRadius: "var(--radius-xl)", borderBottomRightRadius: "var(--radius-xl)" }}>
+            <button className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button className="btn-primary" onClick={submit}>Submit Route</button>
+          </div>
+        </div>
       )}
     </div>
   );

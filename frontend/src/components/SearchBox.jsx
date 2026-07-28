@@ -1,5 +1,4 @@
 import { useState, useRef } from "react";
-import { styles } from "../styles/styles";
 import { fetchStops } from "../services/api";
 
 export default function SearchBar({ onSearch }) {
@@ -24,36 +23,16 @@ export default function SearchBar({ onSearch }) {
     }, 250);
   };
 
-  const suggestionStyle = {
-    position: "absolute",
-    background: "#fff",
-    border: "1px solid #ddd",
-    borderRadius: 6,
-    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-    zIndex: 999,
-    width: "100%",
-    maxHeight: 220,
-    overflowY: "auto",
-  };
-
-  const suggestionItem = (hovered) => ({
-    padding: "8px 12px",
-    cursor: "pointer",
-    fontSize: 14,
-    backgroundColor: hovered ? "#f0f4ff" : "#fff",
-    borderBottom: "1px solid #f3f3f3",
-  });
-
   return (
-    <div style={styles.card}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="glass-card animate-slide-up">
+      <h3 className="heading-3" style={{ marginTop: 0, marginBottom: "1.5rem" }}>Find your route</h3>
+      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
 
-        {/* FROM INPUT */}
         <div style={{ position: "relative" }}>
-          <label style={{ fontSize: 12, fontWeight: "bold", color: "#555", display: "block", marginBottom: 4 }}>From</label>
+          <label className="label">Origin</label>
           <input
-            style={styles.input}
-            placeholder="Type stop name..."
+            className="input-field"
+            placeholder="Where are you starting?"
             value={from}
             onChange={(e) => {
               setFrom(e.target.value);
@@ -62,14 +41,13 @@ export default function SearchBar({ onSearch }) {
             onBlur={() => setTimeout(() => setFromSug([]), 150)}
           />
           {fromSug.length > 0 && (
-            <div style={suggestionStyle}>
+            <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#fff", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", zIndex: 10, boxShadow: "var(--shadow-md)", maxHeight: "200px", overflowY: "auto" }}>
               {fromSug.map((s, i) => (
-                <div
-                  key={i}
-                  style={suggestionItem(false)}
-                  onMouseEnter={e => e.target.style.backgroundColor = "#f0f4ff"}
-                  onMouseLeave={e => e.target.style.backgroundColor = "#fff"}
+                <div key={i}
+                  style={{ padding: "0.75rem 1rem", cursor: "pointer", borderBottom: i === fromSug.length - 1 ? "none" : "1px solid var(--color-border)" }}
                   onMouseDown={() => { setFrom(s); setFromSug([]); }}
+                  onMouseEnter={(e) => e.target.style.background = "var(--color-bg)"}
+                  onMouseLeave={(e) => e.target.style.background = "transparent"}
                 >
                   📍 {s}
                 </div>
@@ -78,12 +56,11 @@ export default function SearchBar({ onSearch }) {
           )}
         </div>
 
-        {/* TO INPUT */}
         <div style={{ position: "relative" }}>
-          <label style={{ fontSize: 12, fontWeight: "bold", color: "#555", display: "block", marginBottom: 4 }}>To</label>
+          <label className="label">Destination</label>
           <input
-            style={styles.input}
-            placeholder="Type stop name..."
+            className="input-field"
+            placeholder="Where do you want to go?"
             value={to}
             onChange={(e) => {
               setTo(e.target.value);
@@ -92,14 +69,13 @@ export default function SearchBar({ onSearch }) {
             onBlur={() => setTimeout(() => setToSug([]), 150)}
           />
           {toSug.length > 0 && (
-            <div style={suggestionStyle}>
+            <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#fff", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", zIndex: 10, boxShadow: "var(--shadow-md)", maxHeight: "200px", overflowY: "auto" }}>
               {toSug.map((s, i) => (
-                <div
-                  key={i}
-                  style={suggestionItem(false)}
-                  onMouseEnter={e => e.target.style.backgroundColor = "#f0f4ff"}
-                  onMouseLeave={e => e.target.style.backgroundColor = "#fff"}
+                <div key={i}
+                  style={{ padding: "0.75rem 1rem", cursor: "pointer", borderBottom: i === toSug.length - 1 ? "none" : "1px solid var(--color-border)" }}
                   onMouseDown={() => { setTo(s); setToSug([]); }}
+                  onMouseEnter={(e) => e.target.style.background = "var(--color-bg)"}
+                  onMouseLeave={(e) => e.target.style.background = "transparent"}
                 >
                   📍 {s}
                 </div>
@@ -109,7 +85,8 @@ export default function SearchBar({ onSearch }) {
         </div>
 
         <button
-          style={styles.blueBtn}
+          className="btn-primary"
+          style={{ marginTop: "1rem" }}
           onClick={() => onSearch(from, to)}
         >
           Search Route

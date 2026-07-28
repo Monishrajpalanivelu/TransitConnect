@@ -42,7 +42,14 @@ public class AuthService {
 
       public String register(com.connect.transitconnect.dto.RegisterRequest request) {
             if (userRepository.findByUsername(request.getUsername()).isPresent()) {
-                  throw new RuntimeException("Username already exists");
+                  throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST, "Username already exists"
+                  );
+            }
+            if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+                  throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST, "Email already exists"
+                  );
             }
             com.connect.transitconnect.entity.User user = new com.connect.transitconnect.entity.User();
             user.setUsername(request.getUsername());

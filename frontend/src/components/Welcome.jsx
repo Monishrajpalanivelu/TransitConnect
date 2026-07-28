@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { styles } from "../styles/styles";
 
 export default function Welcome() {
   const [isOpen, setIsOpen] = useState(true);
@@ -7,16 +6,17 @@ export default function Welcome() {
   if (!isOpen) {
     return (
       <div
+        className="glass-card animate-slide-up"
         onClick={() => setIsOpen(true)}
         style={{
-          ...styles.card,
-          padding: "10px",
+          padding: "1rem",
           textAlign: "center",
           cursor: "pointer",
-          backgroundColor: "#e0f2fe",
-          marginBottom: 15,
-          color: "#0284c7",
-          fontWeight: "bold"
+          backgroundColor: "#E0E7FF",
+          border: "1px solid #C7D2FE",
+          color: "var(--color-primary)",
+          fontWeight: 600,
+          marginBottom: "1.5rem"
         }}
       >
         👋 New to TransitConnect? Click to read guidelines
@@ -25,95 +25,50 @@ export default function Welcome() {
   }
 
   return (
-    <div style={{ ...styles.card, marginBottom: 20 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 12
-        }}
-      >
-        <h3 style={{ margin: 0 }}>👋 Welcome to TransitConnect</h3>
-        <button
-          onClick={() => setIsOpen(false)}
-          style={{
-            background: "transparent",
-            border: "none",
-            fontSize: "18px",
-            cursor: "pointer",
-            color: "#666"
-          }}
-        >
-          ✖
-        </button>
+    <div className="glass-card animate-slide-up" style={{ marginBottom: "1.5rem" }}>
+      <div className="flex-between" style={{ marginBottom: "1rem" }}>
+        <h3 className="heading-3" style={{ margin: 0, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <span>👋</span> Welcome to TransitConnect
+        </h3>
+        <button className="btn-ghost" onClick={() => setIsOpen(false)}>✖</button>
       </div>
 
-      <div style={{ maxHeight: "300px", overflowY: "auto", paddingRight: "6px" }}>
-        <p>
-          <strong>What is this?</strong><br />
-          TransitConnect is a community-driven platform for discovering local
-          travel routes with clear, practical details.
-        </p>
-
-        <p style={{ marginTop: 12 }}>
-          <strong>How does it work?</strong><br />
-          You don’t just consume data — you help shape it.
-        </p>
-
-        <ul style={{ paddingLeft: 20, marginTop: 6 }}>
-          <li>Browse routes shared by others</li>
-          <li>Add routes based on real travel experience</li>
-          <li>Benefit from continuously updated local knowledge</li>
-        </ul>
-
-        <h4 style={{ marginTop: 20 }}>🚍 What you can do here</h4>
-        <ul style={{ paddingLeft: 20, marginTop: 6 }}>
-          <li>Find reliable local routes</li>
-          <li>Compare available travel options</li>
-          <li>Avoid outdated or confusing information</li>
-        </ul>
-
-        <h4 style={{ marginTop: 22, color: "#d97706" }}>
-          ⚠️ Community responsibility
-        </h4>
-        <p style={{ marginTop: 6 }}>
-          This platform works only when shared information is accurate.
-          Before posting, consider:
-        </p>
-
-        <ul style={{ paddingLeft: 20 }}>
-          <li>❓Is this route real and currently usable?</li>
-          <li>❓Have I personally verified this?</li>
-          <li>❓ill this genuinely help someone else?</li>
-        </ul>
-
-        <div
-          style={{
-            background: "#fef2f2",
-            padding: 10,
-            borderRadius: 6,
-            marginTop: 12
-          }}
-        >
-          🚫 <strong>Do not</strong> post false, misleading, duplicate, or irrelevant routes.
-          <br />
-          ✅ <strong>Only share</strong> accurate, experience-based information.
+      <div style={{ maxHeight: "350px", overflowY: "auto", paddingRight: "0.5rem" }}>
+        <div style={{ marginBottom: "1.5rem" }}>
+          <h4 className="heading-3" style={{ fontSize: "1.1rem" }}>What is this?</h4>
+          <p className="text-muted" style={{ marginTop: "0.25rem", lineHeight: "1.5" }}>
+            TransitConnect is a community-driven platform for discovering local travel routes with clear, practical details.
+          </p>
         </div>
 
-        <p style={{ marginTop: 14 }}>
-          Misleading data affects real people’s daily travel decisions.
-        </p>
+        <div style={{ marginBottom: "1.5rem" }}>
+          <h4 className="heading-3" style={{ fontSize: "1.1rem" }}>How does it work?</h4>
+          <p className="text-muted" style={{ marginTop: "0.25rem", lineHeight: "1.5" }}>
+            You don’t just consume data — you help shape it.
+          </p>
+          <ul className="text-muted" style={{ paddingLeft: "1.5rem", marginTop: "0.5rem", lineHeight: "1.6" }}>
+            <li>Browse routes shared by others</li>
+            <li>Add routes based on real travel experience</li>
+            <li>Benefit from continuously updated local knowledge</li>
+          </ul>
+        </div>
 
-        <h4 style={{ marginTop: 22, color: "#059669" }}>
-          🤝 Why this matters
-        </h4>
-        <p>
-          TransitConnect is built by people who travel locally.
-          Every accurate contribution improves someone’s journey.
-        </p>
+        <div className="alert-warning" style={{ marginBottom: "1.5rem" }}>
+          <strong style={{ display: "block", marginBottom: "0.25rem" }}>⚠️ Community responsibility</strong>
+          This platform works only when shared information is accurate. Before posting, consider:
+          <ul style={{ paddingLeft: "1.5rem", marginTop: "0.5rem", marginBottom: 0 }}>
+            <li>Is this route real and currently usable?</li>
+            <li>Have I personally verified this?</li>
+            <li>Will this genuinely help someone else?</li>
+          </ul>
+        </div>
 
-        <p style={{ textAlign: "center", fontWeight: "bold", marginTop: 18 }}>
+        <div className="alert-info" style={{ marginBottom: "1.5rem" }}>
+          <strong style={{ display: "block", marginBottom: "0.25rem" }}>🤝 Why this matters</strong>
+          TransitConnect is built by people who travel locally. Every accurate contribution improves someone’s journey. Please do not post false or duplicate routes.
+        </div>
+
+        <p style={{ textAlign: "center", fontWeight: 600, color: "var(--color-primary)", margin: "2rem 0 1rem" }}>
           Ready to explore or contribute responsibly?
         </p>
       </div>
